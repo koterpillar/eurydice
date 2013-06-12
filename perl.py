@@ -1,3 +1,5 @@
+import socket
+
 class PerlClass(object):
     def __init__(self, perl, name):
         self.perl = perl
@@ -19,17 +21,22 @@ class PerlObject(object):
 
 class Perl(object):
     def __init__(self, port):
-        # TODO write this
-        pass
+        # objects registry
+        self.objects = []
+        self.transport = socket.create_connection(('localhost', port))
 
     def use(self, module):
-        pass
+        raise NotImplementedError("Making callvirt work first.")
 
     def klass(self, cls):
         return PerlClass(self, cls)
 
     def call(self, method, *args):
-        pass
+        return self._call(method=method, args=args)
 
     def callvirt(self, this, method, *args):
-        pass
+        return self._call(method=method, args=[this] + args, virtual=True)
+
+    def _call(self, method, args, virtual=False):
+        # TODO write this
+        raise NotImplementedError("TODO")

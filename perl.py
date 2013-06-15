@@ -28,6 +28,17 @@ class PerlJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         raise Exception("haha")
 
+class PerlJSONDecoder(json.JSONDecoder):
+    def __init__(self, perl):
+        super(PerlJSONDecoder, self).__init__(object_hook=self.decode_object)
+        self.perl = perl
+
+    def decode_object(self, obj):
+        if isinstance(obj, dict) and 'plproxy' in obj:
+            return PerlObject(self.perl, obj)
+        else:
+            return obj
+
 class Perl(object):
     def __init__(self, port):
         self.socket = socket.create_connection(('localhost', port))
@@ -35,7 +46,7 @@ class Perl(object):
 
         # Serializer
         self.encoder = PerlJSONEncoder(self)
-        self.decoder = json.JSONDecoder()
+        self.decoder = PerlJSONDecoder(self)
 
         # Objects registry
         self.objects = []
@@ -45,6 +56,7 @@ class Perl(object):
 
     def use(self, module):
         self._send('use', module)
+        return self._run()
 
     def klass(self, cls):
         return PerlClass(self, cls)
@@ -74,14 +86,12 @@ class Perl(object):
         line = self.transport.readline()
 
         line = self.decoder.decode(line)
-        from pprint import pprint
-        pprint(line)
         command = line[0]
         args = line[1:]
 
         if command in self.COMMANDS:
             # TODO: only return actually returns!
-            return getattr(self, self.COMMANDS[command])(args)
+            return getattr(self, self.COMMANDS[command])(*args)
 
     def ret(self, *args):
         return args[0]

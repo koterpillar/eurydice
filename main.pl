@@ -6,10 +6,13 @@ use strict;
 use warnings;
 
 use Data::Dumper;
+use Data::Visitor::Callback;
 
 use JSON;
 
 use Module::Load;
+
+use Scalar::Util qw(blessed weaken);
 
 sub new {
 	my ($class, $transport) = @_;
@@ -21,7 +24,15 @@ sub new {
 	# Serializer
 	$this->{json} = JSON->new;
 	$this->{json}->pretty(0);
-	$this->{json}->filter_json_single_key_object(proxy => sub {
+	$this->{json}->filter_json_single_key_object(plproxy => sub {
+		my ($index) = @_;
+		print Dumper({
+			args => \@_,
+			objects => $this->{objects},
+		});
+		return $this->{objects}->[$index];
+	});
+	$this->{json}->filter_json_single_key_object(pyproxy => sub {
 		# TODO: create a PerlServer::Proxy object
 		die("'Their' proxies aren't implemented.");
 	});
@@ -57,10 +68,29 @@ sub run {
 	}
 }
 
+sub encode {
+	my ($this, $args) = @_;
+
+	my $visitor = Data::Visitor::Callback->new(
+		object => sub {
+			my (undef, $object) = @_;
+
+			my $index = @{$this->{objects}};
+			push @{$this->{objects}}, $object;
+			#weaken $this->{objects}->[$index];
+
+			return { plproxy => $index };
+		}
+	);
+	$args = $visitor->visit($args);
+
+	return $this->{json}->encode($args);
+}
+
 sub send {
 	my ($this, $command, @args) = @_;
 
-	my $line = $this->{json}->encode([$command, @args]);
+	my $line = $this->encode([$command, @args]);
 
 	$this->{transport}->print("$line\n");
 }
@@ -92,35 +122,34 @@ sub use {
 	$this->send('useok');
 }
 
-sub serialize {
-	my ($this, $value) = @_;
-
-	if (ref $value) {
-		die "Cannot serialize anything useful.\n";
-	}
-
-	return JSON::to_json($value, { allow_nonref => 1 });
-}
-
-sub deserialize {
-	my ($this, $value) = @_;
-
-	return JSON::from_json($value, { allow_nonref => 1 });
-}
+# Main
 
 use IO::Socket;
 
-# Main
-
 my $PORT = 4444;
 
-my $server = IO::Socket::INET->new(
+my $server;
+
+my $shutdown = sub {
+	if ($server) {
+		$server->shutdown(2);
+	}
+};
+
+END { $shutdown->(); }
+$SIG{'TERM'} = $shutdown;
+
+$server = IO::Socket::INET->new(
 	Proto => 'tcp',
 	LocalPort => $PORT,
 	Listen => SOMAXCONN,
 ) or die("Cannot set up server.");
 
 while (my $client = $server->accept()) {
-	my $server = PerlServer->new($client);
-	$server->run();
+	my $responder = PerlServer->new($client);
+	my $success = eval { $responder->run() };
+	if (!$success) {
+		print STDERR $@;
+	}
+	$client->shutdown(2);
 }

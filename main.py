@@ -3,7 +3,7 @@ from perl import Perl
 
 p = Perl(4444)
 
-p.use('Foo')
+p.use('Appender')
 
 cls = p.klass('Appender')
 

@@ -7,8 +7,18 @@ p.use('Appender')
 
 cls = p.klass('Appender')
 
-obj = cls('plus') # 'new' by default
+obj = cls('one') # 'new' by default
 
-result = obj.append('minus')
+result = obj.append('two')
 
-assert result == 'minusplus'
+assert result == 'twoone'
+
+class Source(object):
+    def string(self):
+        return 'three'
+
+obj.set_source(Source())
+
+result = obj.append_with_source('four')
+
+assert result == 'fouronethree'

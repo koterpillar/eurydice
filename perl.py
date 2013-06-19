@@ -7,7 +7,7 @@ class PerlClass(object):
         self.name = name
 
     def __getattr__(self, method):
-        return lambda *args: self.perl.callvirt(self.name, method, *args)
+        return lambda *args: self.perl.call(self.name, method, *args)
 
     def __call__(self, *args):
         return self.new(*args)
@@ -18,7 +18,10 @@ class PerlObject(object):
         self.ref = ref
 
     def __getattr__(self, method):
-        return lambda *args: self.perl.callvirt(self.ref, method, *args)
+        return lambda *args: self.perl.call(self.ref, method, *args)
+
+class PerlError(Exception):
+    pass
 
 class PerlJSONEncoder(json.JSONEncoder):
     def __init__(self, perl):
@@ -26,7 +29,15 @@ class PerlJSONEncoder(json.JSONEncoder):
         self.perl = perl
 
     def default(self, obj):
-        raise Exception("haha")
+        if isinstance(obj, PerlObject):
+            return obj.ref
+        elif isinstance(obj, PerlClass):
+            return obj.name
+
+        index = len(self.perl.objects)
+        self.perl.objects.append(obj)
+
+        return { 'pyproxy': index }
 
 class PerlJSONDecoder(json.JSONDecoder):
     def __init__(self, perl):
@@ -34,13 +45,17 @@ class PerlJSONDecoder(json.JSONDecoder):
         self.perl = perl
 
     def decode_object(self, obj):
-        if isinstance(obj, dict) and 'plproxy' in obj:
-            return PerlObject(self.perl, obj)
-        else:
-            return obj
+        if isinstance(obj, dict):
+            if 'plproxy' in obj:
+                return PerlObject(self.perl, obj)
+            elif 'pyproxy' in obj:
+                return self.perl.objects[obj['pyproxy']]
+        return obj
 
 class Perl(object):
     def __init__(self, port):
+        self.identity = 'client'
+
         self.socket = socket.create_connection(('localhost', port))
         self.transport = self.socket.makefile()
 
@@ -61,17 +76,13 @@ class Perl(object):
     def klass(self, cls):
         return PerlClass(self, cls)
 
-    def call(self, method, *args):
-        return self._call(method=method, args=args)
-
-    def callvirt(self, this, method, *args):
-        return self._call(method=method, args=[this] + list(args), virtual=True)
-
-    def _call(self, method, args, virtual=False):
-        self._send('call', virtual, method, *args)
+    def call(self, obj, method, *args):
+        self._send('call', obj, method, *args)
         return self._run()
 
     COMMANDS = {
+        'call': 'callback',
+        'error': 'error',
         'return': 'ret',
         'useok': 'useok',
     }
@@ -82,7 +93,6 @@ class Perl(object):
         self.transport.flush()
 
     def _run(self):
-        # TODO: has to process more than one result!
         line = self.transport.readline()
 
         line = self.decoder.decode(line)
@@ -90,11 +100,29 @@ class Perl(object):
         args = line[1:]
 
         if command in self.COMMANDS:
-            # TODO: only return actually returns!
             return getattr(self, self.COMMANDS[command])(*args)
+        else:
+            # TODO: custom exception
+            raise Exception("Transport exception")
 
-    def ret(self, *args):
-        return args[0]
+    def callback(self, obj, method, *args):
+        try:
+            val = getattr(obj, method)(*args)
+            returned = True
+        except Exception, e:
+            returned = False
+
+        if returned:
+            self._send('return', val)
+        else:
+            self._send('error', str(e))
+        return self._run()
+
+    def error(self, err):
+        raise PerlError(err)
+
+    def ret(self, value):
+        return value
 
     def useok(self, *args):
         return

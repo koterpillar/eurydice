@@ -12,7 +12,7 @@ class Concat(object):
 
     def concat(self, other):
         if self.source:
-            source_str = source.get_string()
+            source_str = self.source.get_string()
         else:
             source_str = ""
 

@@ -20,13 +20,22 @@ def setup_module(module):
 def teardown_module(module):
     module.pserver.terminate()
 
-def test_pypl():
+def test_python_python():
     client = pypl.Client('localhost', PORT)
 
     cmodule = client.use('concat')
     obj = cmodule.Concat('one')
-    res = obj.concat('two')
 
-    assert res == 'onetwo'
+    assert obj.concat('two') == 'onetwo'
+
+    class Source(object):
+        def get_string(self):
+            return 'three'
+
+    source = Source()
+
+    obj.set_source(source)
+
+    assert obj.concat('four') == 'onethreefour'
 
     client.close()

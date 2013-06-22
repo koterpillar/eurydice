@@ -12,7 +12,10 @@ class Concat(object):
 
     def concat(self, other):
         if self.source:
-            source_str = self.source.get_string()
+            try:
+                source_str = self.source.get_string()
+            except Exception, e:
+                source_str = "[" + e.message + "]"
         else:
             source_str = ""
 

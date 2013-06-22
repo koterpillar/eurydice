@@ -34,14 +34,20 @@ def test_python_python():
         def get_string(self):
             return 'three'
 
-    source = Source()
-
-    obj.set_source(source)
+    obj.set_source(Source())
 
     assert obj.concat('four') == 'onethreefour'
 
     with pytest.raises(pypl.RemoteError) as e:
         obj.breakdown('five')
     assert e.value.message == 'five'
+
+    class BadSource(object):
+        def get_string(self):
+            raise Exception("six")
+
+    obj.set_source(BadSource())
+
+    assert obj.concat('seven') == 'one[six]seven'
 
     client.close()

@@ -52,11 +52,11 @@ class PerlJSONDecoder(json.JSONDecoder):
                 return self.perl.objects[obj['pyproxy']]
         return obj
 
-class Perl(object):
-    def __init__(self, port):
+class Client(object):
+    def __init__(self, host, port):
         self.identity = 'client'
 
-        self.socket = socket.create_connection(('localhost', port))
+        self.socket = socket.create_connection((host, port))
         self.transport = self.socket.makefile()
 
         # Serializer
@@ -65,9 +65,6 @@ class Perl(object):
 
         # Objects registry
         self.objects = []
-
-        # Continuation stack
-        self.stack = []
 
     def use(self, module):
         self._send('use', module)

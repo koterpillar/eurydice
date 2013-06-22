@@ -1,6 +1,8 @@
 from multiprocessing import Process
 import random
 
+import pytest
+
 # TODO: why does py.test not add . to sys.path?
 import sys
 sys.path.append('.')
@@ -37,5 +39,9 @@ def test_python_python():
     obj.set_source(source)
 
     assert obj.concat('four') == 'onethreefour'
+
+    with pytest.raises(pypl.RemoteError) as e:
+        obj.breakdown('five')
+    assert e.value.message == 'five'
 
     client.close()

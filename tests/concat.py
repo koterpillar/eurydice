@@ -17,3 +17,6 @@ class Concat(object):
             source_str = ""
 
         return self.own + source_str + other
+
+    def breakdown(self, how):
+        raise Exception(how)

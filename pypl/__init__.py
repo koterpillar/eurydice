@@ -1,114 +1,61 @@
+from functools import wraps
+
 import json
 
 import socket
 import SocketServer
 
 
-class PerlClass(object):
-    def __init__(self, perl, name):
-        self.perl = perl
-        self.name = name
-
-    def __getattr__(self, method):
-        return lambda *args: self.perl.call(self.name, method, *args)
-
-    def __call__(self, *args):
-        return self.new(*args)
-
-class PerlObject(object):
-    def __init__(self, perl, ref):
-        self.perl = perl
+class RemoteObject(object):
+    def __init__(self, remote, ref):
+        self.remote = remote
         self.ref = ref
 
     def __getattr__(self, method):
-        return lambda *args: self.perl.call(self.ref, method, *args)
+        return lambda *args: self.remote.call(self.ref, method, *args)
 
-class PerlError(Exception):
+
+class RemoteError(Exception):
     pass
 
-class PerlJSONEncoder(json.JSONEncoder):
-    def __init__(self, perl):
-        super(PerlJSONEncoder, self).__init__()
-        self.perl = perl
+
+class RemoteJSONEncoder(json.JSONEncoder):
+    def __init__(self, endpoint):
+        super(RemoteJSONEncoder, self).__init__()
+        self.endpoint = endpoint
 
     def default(self, obj):
-        if isinstance(obj, PerlObject):
+        if isinstance(obj, RemoteObject):
             return obj.ref
-        elif isinstance(obj, PerlClass):
-            return obj.name
 
-        index = len(self.perl.objects)
-        self.perl.objects.append(obj)
+        index = len(self.endpoint.objects)
+        self.endpoint.objects.append(obj)
 
-        return { 'pyproxy': index }
+        return {
+            '_remote_proxy': index,
+            'instance': self.endpoint.identity,
+        }
 
-class PerlJSONDecoder(json.JSONDecoder):
-    def __init__(self, perl):
-        super(PerlJSONDecoder, self).__init__(object_hook=self.decode_object)
-        self.perl = perl
+class RemoteJSONDecoder(json.JSONDecoder):
+    def __init__(self, endpoint):
+        super(RemoteJSONDecoder, self).__init__(object_hook=self.decode_object)
+        self.endpoint = endpoint
 
     def decode_object(self, obj):
         if isinstance(obj, dict):
-            if 'plproxy' in obj:
-                return PerlObject(self.perl, obj)
-            elif 'pyproxy' in obj:
-                return self.perl.objects[obj['pyproxy']]
+            if '_remote_proxy' in obj:
+                if obj['instance'] == self.endpoint.identity:
+                    return self.endpoint.objects[obj['_remote_proxy']]
+                else:
+                    return RemoteObject(self.endpoint, obj)
         return obj
 
 
-class Endpoint(object):
-    def __init__(self, transport, identity):
-        # Serializer
-        self.encoder = PerlJSONEncoder(self)
-        self.decoder = PerlJSONDecoder(self)
-
-        # Objects registry
-        self.objects = []
-
-        self.transport = transport
-
-        self.identity = identity
-
-    def use(self, module):
-        self._send('use', module)
-        return self._run()
-
-    def klass(self, cls):
-        return PerlClass(self, cls)
-
-    def call(self, obj, method, *args):
-        self._send('call', obj, method, *args)
-        return self._run()
-
-    COMMANDS = {
-        'call': 'callback',
-        'error': 'error',
-        'return': 'ret',
-        'useok': 'useok',
-    }
-
-    def _send(self, command, *args):
-        line = self.encoder.encode([command] + list(args))
-        print >>self.transport, line
-        self.transport.flush()
-
-    def _run(self):
-        # TODO: rename this
-        line = self.transport.readline()
-
-        line = self.decoder.decode(line)
-        command = line[0]
-        args = line[1:]
-
-        if command in self.COMMANDS:
-            return getattr(self, self.COMMANDS[command])(*args)
-        else:
-            # TODO: custom exception
-            raise Exception("Transport exception")
-
-    def callback(self, obj, method, *args):
+def callback(func):
+    @wraps(func)
+    def decorated(self, *args):
         try:
-            val = getattr(obj, method)(*args)
+            val = func(self, *args)
             returned = True
         except Exception, e:
             returned = False
@@ -117,16 +64,70 @@ class Endpoint(object):
             self._send('return', val)
         else:
             self._send('error', str(e))
-        return self._run()
+        return self._receive()
+    return decorated
 
-    def error(self, err):
-        raise PerlError(err)
 
-    def ret(self, value):
+class Endpoint(object):
+    def __init__(self, transport, identity):
+        # Serializer
+        self.encoder = RemoteJSONEncoder(self)
+        self.decoder = RemoteJSONDecoder(self)
+
+        # Objects registry
+        self.objects = []
+
+        self.transport = transport
+
+        self.identity = identity
+
+    def _send(self, command, *args):
+        line = self.encoder.encode([command] + list(args))
+        print >>self.transport, line
+        self.transport.flush()
+
+    def _receive(self):
+        line = self.transport.readline()
+
+        line = self.decoder.decode(line)
+        command = line[0]
+        args = line[1:]
+
+        command_function = 'command_%s' % command
+        if hasattr(self, command_function):
+            return getattr(self, command_function)(*args)
+        raise InvalidCommand(command)
+
+    def _send_receive(self, command, *args):
+        self._send(command, *args)
+        return self._receive()
+
+    def use(self, module):
+        return self._send_receive('import', module)
+
+    def get_global(self, obj):
+        return self._send_receive('global', obj)
+
+    def call(self, obj, method, *args):
+        return self._send_receive('call', obj, method, *args)
+
+    @callback
+    def command_call(self, obj, method, *args):
+        return getattr(obj, method)(*args)
+
+    @callback
+    def command_global(self, obj):
+        return globals()[obj]
+
+    @callback
+    def command_import(self, module):
+        return __import__(module)
+
+    def command_error(self, err):
+        raise RemoteError(err)
+
+    def command_return(self, value):
         return value
-
-    def useok(self, *args):
-        return
 
 
 class ServerEndpoint(Endpoint):
@@ -135,7 +136,7 @@ class ServerEndpoint(Endpoint):
 
     def run(self):
         while True:
-            self._run()
+            self._receive()
 
 
 class ServerHandler(SocketServer.StreamRequestHandler):
@@ -151,7 +152,8 @@ class Server(SocketServer.TCPServer, object):
 
 class Client(Endpoint):
     def __init__(self, host, port):
-        sock = socket.create_connection((host, port))
-        transport = sock.makefile()
+        self.socket = socket.create_connection((host, port))
+        super(Client, self).__init__(self.socket.makefile(), 'client')
 
-        super(Client, self).__init__(transport, 'client')
+    def close(self):
+        self.socket.shutdown()

@@ -7,26 +7,6 @@ sys.path.append('.')
 
 import pypl
 
-class Concat(object):
-    """
-    A test class concatenating strings passed in various ways
-    """
-
-    def __init__(own):
-        self.own = own
-        self.source = None
-
-    def set_source(source):
-        self.source = source
-
-    def concat(other):
-        if self.source:
-            source_str = source.get_string()
-        else:
-            source_str = ""
-
-        return self.own + source_str + other
-
 PORT = random.randrange(5000, 6000)
 
 def run_server():
@@ -43,8 +23,11 @@ def teardown_module(module):
 def test_pypl():
     client = pypl.Client('localhost', PORT)
 
-    cclass = client.klass('Concat')
+    cmodule = client.use('concat')
+    cclass = cmodule.__getattr__('Concat')()
     obj = cclass('one')
     res = obj.concat('two')
 
     assert res == 'onetwo'
+
+    client.close()

@@ -1,4 +1,5 @@
 from multiprocessing import Process
+import random
 
 # TODO: why does py.test not add . to sys.path?
 import sys
@@ -26,11 +27,11 @@ class Concat(object):
 
         return self.own + source_str + other
 
-PORT = 5555
+PORT = random.randrange(5000, 6000)
 
 def run_server():
-    server = pypl.Server()
-    server.listen(PORT)
+    server = pypl.Server(PORT)
+    server.serve_forever()
 
 def setup_module(module):
     module.pserver = Process(target=run_server)

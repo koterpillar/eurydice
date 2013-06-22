@@ -1,5 +1,8 @@
 import json
+
 import socket
+import SocketServer
+
 
 class PerlClass(object):
     def __init__(self, perl, name):
@@ -52,19 +55,19 @@ class PerlJSONDecoder(json.JSONDecoder):
                 return self.perl.objects[obj['pyproxy']]
         return obj
 
-class Client(object):
-    def __init__(self, host, port):
-        self.identity = 'client'
 
-        self.socket = socket.create_connection((host, port))
-        self.transport = self.socket.makefile()
-
+class Endpoint(object):
+    def __init__(self, transport, identity):
         # Serializer
         self.encoder = PerlJSONEncoder(self)
         self.decoder = PerlJSONDecoder(self)
 
         # Objects registry
         self.objects = []
+
+        self.transport = transport
+
+        self.identity = identity
 
     def use(self, module):
         self._send('use', module)
@@ -90,6 +93,7 @@ class Client(object):
         self.transport.flush()
 
     def _run(self):
+        # TODO: rename this
         line = self.transport.readline()
 
         line = self.decoder.decode(line)
@@ -123,3 +127,31 @@ class Client(object):
 
     def useok(self, *args):
         return
+
+
+class ServerEndpoint(Endpoint):
+    def __init__(self, sock):
+        super(ServerEndpoint, self).__init__(sock, 'server')
+
+    def run(self):
+        while True:
+            self._run()
+
+
+class ServerHandler(SocketServer.StreamRequestHandler):
+    def handle(self):
+        endpoint = ServerEndpoint(self.rfile)
+        endpoint.run()
+
+
+class Server(SocketServer.TCPServer, object):
+    def __init__(self, port):
+        super(Server, self).__init__(('localhost', port), ServerHandler)
+
+
+class Client(Endpoint):
+    def __init__(self, host, port):
+        sock = socket.create_connection((host, port))
+        transport = sock.makefile()
+
+        super(Client, self).__init__(transport, 'client')

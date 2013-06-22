@@ -156,4 +156,4 @@ class Client(Endpoint):
         super(Client, self).__init__(self.socket.makefile(), 'client')
 
     def close(self):
-        self.socket.shutdown()
+        self.socket.shutdown(socket.SHUT_RDWR)

@@ -24,8 +24,7 @@ def test_pypl():
     client = pypl.Client('localhost', PORT)
 
     cmodule = client.use('concat')
-    cclass = cmodule.__getattr__('Concat')()
-    obj = cclass('one')
+    obj = cmodule.Concat('one')
     res = obj.concat('two')
 
     assert res == 'onetwo'

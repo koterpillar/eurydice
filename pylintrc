@@ -1,0 +1,5 @@
+[MESSAGES CONTROL]
+disable=locally-disabled,star-args,too-few-public-methods
+
+[REPORTS]
+symbols=yes

@@ -1,53 +1,45 @@
+"""
+Tests for the pypl module
+"""
+
 from multiprocessing import Process
 import random
 
 import pytest
 
-# TODO: why does py.test not add . to sys.path?
-import sys
-sys.path.append('.')
-
 import pypl
 
+from tests.objects import Source, BadSource
+
 PORT = random.randrange(5000, 6000)
+ADDRESS = ('localhost', PORT)
 
-def run_server():
-    server = pypl.Server(PORT)
-    server.serve_forever()
-
-def setup_module(module):
-    module.pserver = Process(target=run_server)
-    module.pserver.start()
-
-def teardown_module(module):
-    module.pserver.terminate()
 
 def test_python_python():
-    client = pypl.Client('localhost', PORT)
+    """
+    Test interaction between Python client and server
+    """
+    server = pypl.Server(ADDRESS)
+    pserver = Process(target=server.serve_forever)
+    pserver.start()
 
-    cmodule = client.use('concat')
-    obj = cmodule.Concat('one')
+    client = pypl.Client(ADDRESS)
 
-    assert obj.concat('two') == 'onetwo'
+    robjects = client.use('tests.objects')
+    robj = robjects.Concat('one')
 
-    class Source(object):
-        def get_string(self):
-            return 'three'
+    assert robj.concat('two') == 'onetwo'
 
-    obj.set_source(Source())
+    robj.set_source(Source('three'))
 
-    assert obj.concat('four') == 'onethreefour'
+    assert robj.concat('four') == 'onethreefour'
 
-    with pytest.raises(pypl.RemoteError) as e:
-        obj.breakdown('five')
-    assert e.value.message == 'five'
+    with pytest.raises(pypl.RemoteError) as exc: # pylint:disable=no-member
+        robj.breakdown('five')
+    assert exc.value.message == 'five'
 
-    class BadSource(object):
-        def get_string(self):
-            raise Exception("six")
+    robj.set_source(BadSource('six'))
 
-    obj.set_source(BadSource())
+    assert robj.concat('seven') == 'one[six]seven'
 
-    assert obj.concat('seven') == 'one[six]seven'
-
-    client.close()
+    pserver.terminate()

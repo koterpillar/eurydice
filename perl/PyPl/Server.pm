@@ -1,4 +1,4 @@
-package PerlServer;
+package PyPl::Server;
 
 use strict;
 use warnings;
@@ -11,8 +11,8 @@ use Module::Load;
 
 use Scalar::Util qw(blessed weaken);
 
-use PerlServer::Module;
-use PerlServer::PythonObject;
+use PyPl::Module;
+use PyPl::Object;
 
 
 sub new {
@@ -33,7 +33,7 @@ sub new {
 		if ($data->{instance} eq $this->{identity}) {
 			return $this->{objects}->[$data->{id}];
 		} else {
-			return PerlServer::PythonObject->new($this, $data);
+			return PyPl::Object->new($this, $data);
 		}
 	});
 
@@ -80,7 +80,7 @@ sub encode {
 		object => sub {
 			my (undef, $object) = @_;
 
-			if ($object->isa('PerlServer::PythonObject')) {
+			if ($object->isa('PyPl::Object')) {
 				return { _remote_proxy => $object->{proxy_data} };
 			} else {
 				my $index = @{$this->{objects}};
@@ -133,7 +133,7 @@ sub command_import {
 
 	$this->wrap_action(sub {
 		load $module;
-		return PerlServer::Module->new($this, $module);
+		return PyPl::Module->new($this, $module);
 	});
 }
 

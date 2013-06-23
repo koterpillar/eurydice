@@ -1,4 +1,4 @@
-package PerlServer::Module;
+package PyPl::Module;
 
 use strict;
 use warnings;

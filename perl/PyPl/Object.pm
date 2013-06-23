@@ -1,4 +1,4 @@
-package PerlServer::PythonObject;
+package PyPl::Object;
 
 use strict;
 use warnings;

@@ -5,7 +5,7 @@ use warnings;
 
 use IO::Socket;
 
-use PerlServer;
+use PyPl::Server;
 
 my $port = $ARGV[0];
 
@@ -28,7 +28,7 @@ $server = IO::Socket::INET->new(
 
 print "Listening on $port.\n";
 while (my $client = $server->accept()) {
-	my $responder = PerlServer->new($client);
+	my $responder = PyPl::Server->new($client);
 	my $success = eval { $responder->run() };
 	if (!$success) {
 		print STDERR $@;

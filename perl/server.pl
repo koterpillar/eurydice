@@ -7,7 +7,7 @@ use IO::Socket;
 
 use PerlServer;
 
-my $PORT = 4444;
+my $port = $ARGV[0];
 
 my $server;
 
@@ -22,10 +22,11 @@ $SIG{'TERM'} = $shutdown;
 
 $server = IO::Socket::INET->new(
 	Proto => 'tcp',
-	LocalPort => $PORT,
+	LocalPort => $port,
 	Listen => SOMAXCONN,
 ) or die("Cannot set up server.");
 
+print "Listening on $port.\n";
 while (my $client = $server->accept()) {
 	my $responder = PerlServer->new($client);
 	my $success = eval { $responder->run() };

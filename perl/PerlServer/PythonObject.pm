@@ -4,12 +4,12 @@ use strict;
 use warnings;
 
 sub new {
-	my ($class, $perl, $index) = @_;
+	my ($class, $perl, $data) = @_;
 
 	my $this = bless {}, $class;
 
 	$this->{perl} = $perl;
-	$this->{index} = $index;
+	$this->{proxy_data} = $data;
 
 	return $this;
 }

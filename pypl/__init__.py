@@ -47,8 +47,10 @@ class RemoteJSONEncoder(json.JSONEncoder):
         self.endpoint.objects.append(obj)
 
         return {
-            '_remote_proxy': index,
-            'instance': self.endpoint.identity,
+            '_remote_proxy': {
+                'id': index,
+                'instance': self.endpoint.identity,
+            },
         }
 
 
@@ -66,8 +68,9 @@ class RemoteJSONDecoder(json.JSONDecoder):
         """
         if isinstance(obj, dict):
             if '_remote_proxy' in obj:
-                if obj['instance'] == self.endpoint.identity:
-                    return self.endpoint.objects[obj['_remote_proxy']]
+                proxy = obj['_remote_proxy']
+                if proxy['instance'] == self.endpoint.identity:
+                    return self.endpoint.objects[proxy['id']]
                 else:
                     return RemoteObject(self.endpoint, obj)
         return obj

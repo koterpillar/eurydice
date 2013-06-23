@@ -11,7 +11,7 @@ use Module::Load;
 
 use Scalar::Util qw(blessed weaken);
 
-
+use PerlServer::Module;
 use PerlServer::PythonObject;
 
 
@@ -27,27 +27,21 @@ sub new {
 	# Serializer
 	$this->{json} = JSON->new;
 	$this->{json}->pretty(0);
-	$this->{json}->filter_json_single_key_object(plproxy => sub {
-		my ($index) = @_;
+	$this->{json}->filter_json_single_key_object(_remote_proxy => sub {
+		my ($data) = @_;
 
-		return $this->{objects}->[$index];
-	});
-	$this->{json}->filter_json_single_key_object(pyproxy => sub {
-		my ($index) = @_;
-
-		return PerlServer::PythonObject->new($this, $index);
+		if ($data->{instance} eq $this->{identity}) {
+			return $this->{objects}->[$data->{id}];
+		} else {
+			return PerlServer::PythonObject->new($this, $data);
+		}
 	});
 
 	# Object registry
 	$this->{objects} = [];
 
-	# Continuation stack
-	$this->{stack} = [];
-
 	return $this;
 }
-
-my %commands = map { $_ => 1 } qw(call error return use);
 
 sub run {
 	my ($this) = @_;
@@ -71,8 +65,11 @@ sub process {
 	$line = $this->{json}->decode($line);
 	my ($command, @args) = @{$line};
 
-	if (exists $commands{$command}) {
-		return $this->$command(@args);
+	my $command_func = "command_$command";
+	if ($this->can($command_func)) {
+		return $this->$command_func(@args);
+	} else {
+		die("Unknown command $command.");
 	}
 }
 
@@ -84,12 +81,15 @@ sub encode {
 			my (undef, $object) = @_;
 
 			if ($object->isa('PerlServer::PythonObject')) {
-				return { pyproxy => $object->{index} };
+				return { _remote_proxy => $object->{proxy_data} };
 			} else {
 				my $index = @{$this->{objects}};
 				push @{$this->{objects}}, $object;
 
-				return { plproxy => $index };
+				return { _remote_proxy => {
+					instance => $this->{identity},
+					id => $index,
+				} };
 			}
 		},
 	);
@@ -106,12 +106,12 @@ sub send {
 	$this->{transport}->print("$line\n");
 }
 
-sub call {
-	my ($this, $object, $method, @args) = @_;
+sub wrap_action {
+	my ($this, $action) = @_;
 
 	my $retval;
 	my $success = eval {
-		$retval = $object->$method(@args);
+		$retval = $action->();
 		1;
 	};
 
@@ -122,23 +122,31 @@ sub call {
 	}
 }
 
-sub return {
+sub command_call {
+	my ($this, $object, $method, @args) = @_;
+
+	$this->wrap_action(sub { $object->$method(@args) });
+}
+
+sub command_import {
+	my ($this, $module, @args) = @_;
+
+	$this->wrap_action(sub {
+		load $module;
+		return PerlServer::Module->new($this, $module);
+	});
+}
+
+sub command_return {
 	my ($this, $value) = @_;
 
 	return $value;
 }
 
-sub error {
+sub command_error {
 	my ($this, $error) = @_;
 
 	die($error);
-}
-
-sub use {
-	my ($this, $module, @args) = @_;
-
-	load $module;
-	$this->send('useok');
 }
 
 sub callback {

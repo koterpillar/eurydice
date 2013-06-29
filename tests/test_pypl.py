@@ -2,11 +2,13 @@
 Tests for the pypl module
 """
 
-from multiprocessing import Process
+import gc
+import multiprocessing
 import os
 import random
 import signal
 import time
+import weakref
 
 import pytest
 
@@ -23,75 +25,162 @@ def random_address():
     return ('localhost', port)
 
 
-def test_python_python():
+class InteractionTest(object):
     """
-    Test interaction between Python client and server
+    Test all the client-server interactions
     """
-    address = random_address()
+    def client(self):
+        """
+        Prepare a client to run the tests with
+        """
+        raise NotImplementedError(
+                "client() not implemented in base InteractionTest.")
 
-    server = pypl.Server(address)
-    pserver = Process(target=server.serve_forever)
-    pserver.start()
+    def concat_object(self, client):
+        """
+        Create a test remote object
+        """
+        raise NotImplementedError(
+                "concat_object() not implemented in base InteractionTest.")
 
-    try:
-        client = pypl.Client(address)
+    def test_call(self):
+        """
+        Test basic Python-Python interaction
+        """
+        with self.client() as client:
+            robj = self.concat_object(client)
 
+            assert robj.concat('two') == 'onetwo'
+
+    def test_callback(self):
+        """
+        Test a callback
+        """
+        with self.client() as client:
+            robj = self.concat_object(client)
+
+            robj.set_source(Source('three'))
+
+            assert robj.concat('four') == 'onethreefour'
+
+    def test_remote_exception(self):
+        """
+        Test an exception raised on the remote side
+        """
+        with self.client() as client:
+            robj = self.concat_object(client)
+
+            # pylint:disable=no-member
+            with pytest.raises(pypl.RemoteError) as exc:
+                robj.breakdown('five')
+            assert exc.value.message == 'five'
+
+    def test_local_exception(self):
+        """
+        Test an exception raised locally
+        """
+        with self.client() as client:
+            robj = self.concat_object(client)
+
+            robj.set_source(BadSource('six'))
+
+            assert robj.concat('seven') == 'one[six]seven'
+
+    def test_delete(self):
+        """
+        Test deleting objects
+        """
+        with self.client() as client:
+            robj = self.concat_object(client)
+
+            ref = Source('weak')
+            robj.set_source(ref)
+            ref = weakref.ref(ref)
+
+            del robj
+            gc.collect()
+
+            rgc = client.use('gc')
+            rgc.collect()
+
+            assert ref() == None
+
+            del rgc
+
+
+class ServerClient(object):
+    """
+    Base class for test clients as context objects
+    """
+    def __init__(self):
+        self.address = random_address()
+        self.process = multiprocessing.Process(target=self.run_server)
+
+    def run_server(self):
+        """
+        Run the actual server
+        """
+        raise NotImplementedError(
+                "run_server() not implemented in base ServerClient.")
+
+    def __enter__(self):
+        self.process.start()
+        time.sleep(0.3)
+        return pypl.Client(self.address)
+
+    def __exit__(self, type_, value, traceback):
+        self.process.terminate()
+        return False
+
+
+class PythonServerClient(ServerClient):
+    """
+    Python server returning a client connected to it as a context object
+    """
+    def run_server(self):
+        server = pypl.Server(self.address)
+        server.serve_forever()
+
+
+class TestPythonPython(InteractionTest):
+    """
+    Test interaction with a Python server
+    """
+    def client(self):
+        return PythonServerClient()
+
+    def concat_object(self, client):
         robjects = client.use('tests.objects')
-        robj = robjects.Concat('one')
-
-        assert robj.concat('two') == 'onetwo'
-
-        robj.set_source(Source('three'))
-
-        assert robj.concat('four') == 'onethreefour'
-
-        with pytest.raises(pypl.RemoteError) as exc: # pylint:disable=no-member
-            robj.breakdown('five')
-        assert exc.value.message == 'five'
-
-        robj.set_source(BadSource('six'))
-
-        assert robj.concat('seven') == 'one[six]seven'
-
-    finally:
-        pserver.terminate()
+        return robjects.Concat('one')
 
 
-def test_python_perl():
+class PerlServerClient(ServerClient):
     """
-    Test interaction between Python client and server
+    Perl server returning a client connected to it as a context object
     """
-    (_, port) = address = random_address()
-
-    def start_perl_server():
+    def run_server(self):
         """
         Start the Perl server
         """
+        port = self.address[1]
         os.execvp('perl', ['perl', '-Iperl', 'perl/server.pl', str(port)])
 
-    pserver = Process(target=start_perl_server)
-    pserver.start()
-    time.sleep(0.3)
+    def __enter__(self):
+        client = super(PerlServerClient, self).__enter__()
+        time.sleep(0.4)
+        return client
 
-    try:
-        client = pypl.Client(address)
+    def __exit__(self, type_, value, traceback):
+        os.kill(self.process.pid, signal.SIGKILL)
 
+
+class TestPythonPerl(InteractionTest):
+    """
+    Test interaction with a Perl server
+    """
+    def client(self):
+        return PerlServerClient()
+
+    def concat_object(self, client):
         rclass = client.use('Tests::Concat')
-        robj = rclass.new('one')
-
-        assert robj.concat('two') == 'onetwo'
-
-        robj.set_source(Source('three'))
-
-        assert robj.concat('four') == 'onethreefour'
-
-        with pytest.raises(pypl.RemoteError) as exc: # pylint:disable=no-member
-            robj.breakdown('five\n')
-        assert exc.value.message == 'five\n'
-
-        robj.set_source(BadSource('six\n'))
-
-        assert robj.concat('seven') == 'one[six\n]seven'
-
-    finally:
-        os.kill(pserver.pid, signal.SIGKILL)
+        return rclass.new('one')

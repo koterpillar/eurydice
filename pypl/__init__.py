@@ -21,7 +21,10 @@ class RemoteObject(object):
         self.ref = ref
 
     def __getattr__(self, method):
-        return lambda *args: self.remote.call(self.ref, method, *args)
+        return lambda *args: self.remote.call(self, method, *args)
+
+    def __del__(self):
+        self.remote.delete(self)
 
 
 class RemoteError(Exception):
@@ -43,8 +46,9 @@ class RemoteJSONEncoder(json.JSONEncoder):
         if isinstance(obj, RemoteObject):
             return obj.ref
 
-        index = len(self.endpoint.objects)
-        self.endpoint.objects.append(obj)
+        index = id(obj)
+        if index not in self.endpoint.objects:
+            self.endpoint.objects[index] = obj
 
         return {
             '_remote_proxy': {
@@ -75,6 +79,7 @@ class RemoteJSONDecoder(json.JSONDecoder):
                     return RemoteObject(self.endpoint, obj)
         return obj
 
+
 class TransportException(Exception):
     """
     An error due to incomprehensible data received from the remote side
@@ -104,8 +109,24 @@ def callback(func):
             self._send('return', val)
         else:
             self._send('error', str(exc))
-        return self._receive()
+        return RECEIVE_AGAIN
     return decorated
+
+
+def unpack_args(func):
+    """
+    Unpack the argument array passed as a parameter
+    """
+    @wraps(func)
+    def decorated(self, args):
+        """
+        Wrapped function
+        """
+        return func(self, *args)
+    return decorated
+
+
+RECEIVE_AGAIN = object()
 
 
 class Endpoint(object):
@@ -116,7 +137,7 @@ class Endpoint(object):
         self.encoder = RemoteJSONEncoder(self)
         self.decoder = RemoteJSONDecoder(self)
 
-        self.objects = []
+        self.objects = {}
 
         self.transport = transport
 
@@ -134,16 +155,17 @@ class Endpoint(object):
         """
         Receive a command from the remote side and act on it
         """
-        line = self.transport.readline()
+        result = RECEIVE_AGAIN
+        while result is RECEIVE_AGAIN:
+            line = self.decoder.decode(self.transport.readline())
+            command = line.pop(0)
 
-        line = self.decoder.decode(line)
-        command = line[0]
-        args = line[1:]
-
-        command_function = 'command_%s' % command
-        if hasattr(self, command_function):
-            return getattr(self, command_function)(*args)
-        raise TransportException("Invalid command %s" % command)
+            command_function = 'command_%s' % command
+            if hasattr(self, command_function):
+                result = getattr(self, command_function)(line)
+            else:
+                raise TransportException("Invalid command %s" % command)
+        return result
 
     def _send_receive(self, command, *args):
         """
@@ -170,10 +192,17 @@ class Endpoint(object):
         """
         return self._send_receive('call', obj, method, *args)
 
+    def delete(self, obj):
+        """
+        Delete the reference to the object on the remote side
+        """
+        return self._send_receive('delete', obj)
+
     # Command handlers only use 'self' via the decorator
     # pylint:disable=no-self-use
 
     @callback
+    @unpack_args
     def command_call(self, obj, method, *args):
         """
         Process the call command
@@ -181,6 +210,7 @@ class Endpoint(object):
         return getattr(obj, method)(*args)
 
     @callback
+    @unpack_args
     def command_global(self, obj):
         """
         Process a 'get global object value' command
@@ -188,18 +218,30 @@ class Endpoint(object):
         return globals()[obj]
 
     @callback
+    @unpack_args
     def command_import(self, module):
         """
         Process an 'import module' command
         """
         return importlib.import_module(module)
 
+    @callback
+    def command_delete(self, args):
+        """
+        Release the reference to the object
+        """
+        obj_id = id(args[0])
+        del args[0]
+        del self.objects[obj_id]
+
+    @unpack_args
     def command_error(self, err):
         """
         Process a 'raise error' command
         """
         raise RemoteError(err)
 
+    @unpack_args
     def command_return(self, value):
         """
         Process 'return a value' command

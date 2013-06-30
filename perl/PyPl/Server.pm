@@ -9,11 +9,12 @@ use JSON;
 
 use Module::Load;
 
-use Scalar::Util qw(blessed weaken);
+use Scalar::Util qw(blessed refaddr);
 
 use PyPl::Module;
 use PyPl::Object;
 
+my $RECEIVE_AGAIN = bless \[], 'PerlServer::ReceiveAgain';
 
 sub new {
 	my ($class, $transport) = @_;
@@ -31,14 +32,14 @@ sub new {
 		my ($data) = @_;
 
 		if ($data->{instance} eq $this->{identity}) {
-			return $this->{objects}->[$data->{id}];
+			return $this->{objects}->{$data->{id}};
 		} else {
 			return PyPl::Object->new($this, $data);
 		}
 	});
 
 	# Object registry
-	$this->{objects} = [];
+	$this->{objects} = {};
 
 	return $this;
 }
@@ -56,21 +57,25 @@ sub run {
 sub process {
 	my ($this) = @_;
 
-	my $line = $this->{transport}->getline();
+	my $result = $RECEIVE_AGAIN;
+	while (blessed $result && $result->isa('PerlServer::ReceiveAgain')) {
+		my $line = $this->{transport}->getline();
 
-	if (!defined $line) {
-		die('End of stream.');
+		if (!defined $line) {
+			die('End of stream.');
+		}
+
+		$line = $this->{json}->decode($line);
+		my ($command, @args) = @{$line};
+
+		my $command_func = "command_$command";
+		if ($this->can($command_func)) {
+			$result = $this->$command_func(@args);
+		} else {
+			die("Unknown command $command.");
+		}
 	}
-
-	$line = $this->{json}->decode($line);
-	my ($command, @args) = @{$line};
-
-	my $command_func = "command_$command";
-	if ($this->can($command_func)) {
-		return $this->$command_func(@args);
-	} else {
-		die("Unknown command $command.");
-	}
+	return $result;
 }
 
 sub encode {
@@ -83,8 +88,10 @@ sub encode {
 			if ($object->isa('PyPl::Object')) {
 				return { _remote_proxy => $object->{proxy_data} };
 			} else {
-				my $index = @{$this->{objects}};
-				push @{$this->{objects}}, $object;
+				my $index = refaddr($object);
+				if (!exists $this->{objects}->{$index}) {
+					$this->{objects}->{$index} = $object;
+				}
 
 				return { _remote_proxy => {
 					instance => $this->{identity},
@@ -137,6 +144,16 @@ sub command_import {
 	});
 }
 
+sub command_delete {
+	my ($this, $object) = @_;
+
+	return $this->wrap_action(sub {
+		my $id = refaddr($object);
+		delete $this->{objects}->{$id};
+		return;
+	});
+}
+
 sub command_return {
 	my ($this, $value) = @_;
 
@@ -149,10 +166,17 @@ sub command_error {
 	die($error);
 }
 
-sub callback {
+sub call {
 	my ($this, $object, $method, @args) = @_;
 
 	$this->send('call', $object, $method, @args);
+	return $this->process();
+}
+
+sub delete {
+	my ($this, $object) = @_;
+
+	$this->send('delete', $object);
 	return $this->process();
 }
 

@@ -72,8 +72,8 @@ class InteractionTest(object):
 
             # pylint:disable=no-member
             with pytest.raises(pypl.RemoteError) as exc:
-                robj.breakdown('five')
-            assert exc.value.message == 'five'
+                robj.breakdown('five\n')
+            assert exc.value.message == 'five\n'
 
     def test_local_exception(self):
         """
@@ -82,9 +82,16 @@ class InteractionTest(object):
         with self.client() as client:
             robj = self.concat_object(client)
 
-            robj.set_source(BadSource('six'))
+            robj.set_source(BadSource('six\n'))
 
-            assert robj.concat('seven') == 'one[six]seven'
+            assert robj.concat('seven') == 'one[six\n]seven'
+
+    def remote_gc(self, client):
+        """
+        Initiate the garbage collection on the remote side
+        """
+        raise NotImplementedError(
+                "remote_gc() not implemented in base InteractionTest.")
 
     def test_delete(self):
         """
@@ -100,12 +107,9 @@ class InteractionTest(object):
             del robj
             gc.collect()
 
-            rgc = client.use('gc')
-            rgc.collect()
+            self.remote_gc(client)
 
             assert ref() == None
-
-            del rgc
 
 
 class ServerClient(object):
@@ -142,18 +146,6 @@ class PythonServerClient(ServerClient):
         server.serve_forever()
 
 
-class TestPythonPython(InteractionTest):
-    """
-    Test interaction with a Python server
-    """
-    def client(self):
-        return PythonServerClient()
-
-    def concat_object(self, client):
-        robjects = client.use('tests.objects')
-        return robjects.Concat('one')
-
-
 class PerlServerClient(ServerClient):
     """
     Perl server returning a client connected to it as a context object
@@ -165,13 +157,24 @@ class PerlServerClient(ServerClient):
         port = self.address[1]
         os.execvp('perl', ['perl', '-Iperl', 'perl/server.pl', str(port)])
 
-    def __enter__(self):
-        client = super(PerlServerClient, self).__enter__()
-        time.sleep(0.4)
-        return client
-
     def __exit__(self, type_, value, traceback):
         os.kill(self.process.pid, signal.SIGKILL)
+
+
+class TestPythonPython(InteractionTest):
+    """
+    Test interaction with a Python server
+    """
+    def client(self):
+        return PythonServerClient()
+
+    def concat_object(self, client):
+        robjects = client.use('tests.objects')
+        return robjects.Concat('one')
+
+    def remote_gc(self, client):
+        rgc = client.use('gc')
+        rgc.collect()
 
 
 class TestPythonPerl(InteractionTest):
@@ -184,3 +187,10 @@ class TestPythonPerl(InteractionTest):
     def concat_object(self, client):
         rclass = client.use('Tests::Concat')
         return rclass.new('one')
+
+    def remote_gc(self, client):
+        pass
+
+    @pytest.mark.xfail # pylint:disable=no-member
+    def test_delete(self):
+        super(TestPythonPerl, self).test_delete()

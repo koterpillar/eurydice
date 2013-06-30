@@ -26,7 +26,6 @@ $server = IO::Socket::INET->new(
 	Listen => SOMAXCONN,
 ) or die("Cannot set up server.");
 
-print "Listening on $port.\n";
 while (my $client = $server->accept()) {
 	my $responder = PyPl::Server->new($client);
 	my $success = eval { $responder->run() };

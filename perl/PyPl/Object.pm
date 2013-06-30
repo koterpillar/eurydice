@@ -21,11 +21,13 @@ sub AUTOLOAD {
 
 	my ($this, @args) = @_;
 
-	return $this->{perl}->callback($this, $method, @args);
+	return $this->{perl}->call($this, $method, @args);
 }
 
 sub DESTROY {
-	# TODO: send a 'weaken' request
+	my ($this) = @_;
+
+	$this->{perl}->delete($this);
 }
 
 1;

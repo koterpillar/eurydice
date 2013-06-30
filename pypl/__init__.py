@@ -24,7 +24,10 @@ class RemoteObject(object):
         return lambda *args: self.remote.call(self, method, *args)
 
     def __del__(self):
-        self.remote.delete(self)
+        try:
+            self.remote.delete(self)
+        except socket.error:
+            pass
 
 
 class RemoteError(Exception):

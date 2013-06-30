@@ -103,7 +103,7 @@ def callback(func):
         try:
             val = func(self, *args)
             returned = True
-        except Exception, exc: # pylint:disable=broad-except
+        except Exception as exc: # pylint:disable=broad-except
             returned = False
 
         # pylint:disable=protected-access

@@ -9,7 +9,10 @@ import importlib
 import json
 
 import socket
-import SocketServer
+try:
+    import socketserver # pylint:disable=import-error
+except ImportError:
+    import SocketServer as socketserver
 
 
 class RemoteObject(object):
@@ -267,7 +270,7 @@ class ServerEndpoint(Endpoint):
             self._receive()
 
 
-class ServerHandler(SocketServer.StreamRequestHandler):
+class ServerHandler(socketserver.StreamRequestHandler):
     """
     Request handler for the Server
     """
@@ -276,7 +279,7 @@ class ServerHandler(SocketServer.StreamRequestHandler):
         endpoint.run()
 
 
-class Server(SocketServer.TCPServer, object):
+class Server(socketserver.TCPServer, object):
     """
     A server listening for commands from the remote side
     """

@@ -2,6 +2,8 @@
 PyPl - a protocol for interacting between Python and Perl
 """
 
+from __future__ import print_function
+
 from functools import wraps
 
 import importlib
@@ -154,7 +156,7 @@ class Endpoint(object):
         Send a command to the remote side
         """
         line = self.encoder.encode([command] + list(args))
-        print >> self.transport, line
+        print(line, file=self.transport)
         self.transport.flush()
 
     def _receive(self):

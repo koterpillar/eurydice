@@ -1,0 +1,10 @@
+language: python
+python:
+  - "2.6"
+  - "2.7"
+  - "3.2"
+  - "3.3"
+install:
+  - "curl -L http://cpanmin.us | perl - --sudo App::cpanminus"
+  - "sudo cpanm -n Data::Visitor JSON Module::Load"
+script: "python setup.py test"

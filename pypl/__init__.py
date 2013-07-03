@@ -17,6 +17,20 @@ except ImportError:
     import SocketServer as socketserver
 
 
+class RemoteError(Exception):
+    """
+    An exception occurred on the remote side
+    """
+    pass
+
+
+class TransportException(Exception):
+    """
+    An error due to incomprehensible data received from the remote side
+    """
+    pass
+
+
 class RemoteObject(object):
     """
     A representation of a remote object
@@ -35,13 +49,6 @@ class RemoteObject(object):
             pass
         except TransportException:
             pass
-
-
-class RemoteError(Exception):
-    """
-    An exception occurred on the remote side
-    """
-    pass
 
 
 class RemoteJSONEncoder(json.JSONEncoder):
@@ -88,13 +95,6 @@ class RemoteJSONDecoder(json.JSONDecoder):
                 else:
                     return RemoteObject(self.endpoint, obj)
         return obj
-
-
-class TransportException(Exception):
-    """
-    An error due to incomprehensible data received from the remote side
-    """
-    pass
 
 
 def callback(func):
@@ -168,11 +168,11 @@ class Endpoint(object):
         """
         result = RECEIVE_AGAIN
         while result is RECEIVE_AGAIN:
+            line = self.transport.readline()
             try:
-                line = self.transport.readline()
+                args = self.decoder.decode(line)
             except ValueError:
                 raise TransportException("Invalid data received: '%s'" % line)
-            args = self.decoder.decode(line)
             command = args.pop(0)
 
             command_function = 'command_%s' % command
@@ -275,8 +275,11 @@ class ServerEndpoint(Endpoint):
         """
         Start executing commands from the remote side
         """
-        while True:
-            self._receive()
+        try:
+            while True:
+                self._receive()
+        except TransportException:
+            pass
 
 
 class ServerHandler(socketserver.BaseRequestHandler):

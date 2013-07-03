@@ -23,7 +23,7 @@ def random_address():
     Generate a random port for a test server
     """
     port = random.randrange(5000, 6000)
-    return ('localhost', port)
+    return ('127.0.0.1', port)
 
 
 class InteractionTest(object):

@@ -109,6 +109,7 @@ def callback(func):
             val = func(self, *args)
             returned = True
         except Exception as exc: # pylint:disable=broad-except
+            val = exc
             returned = False
 
         # pylint:disable=protected-access
@@ -116,7 +117,7 @@ def callback(func):
         if returned:
             self._send('return', val)
         else:
-            self._send('error', str(exc))
+            self._send('error', str(val))
         return RECEIVE_AGAIN
     return decorated
 
@@ -261,8 +262,8 @@ class ServerEndpoint(Endpoint):
     """
     An endpoint passively executing commands from the remote side
     """
-    def __init__(self, sock):
-        super(ServerEndpoint, self).__init__(sock, 'server')
+    def __init__(self, transport):
+        super(ServerEndpoint, self).__init__(transport, 'server')
 
     def run(self):
         """
@@ -272,12 +273,13 @@ class ServerEndpoint(Endpoint):
             self._receive()
 
 
-class ServerHandler(socketserver.StreamRequestHandler):
+class ServerHandler(socketserver.BaseRequestHandler):
     """
     Request handler for the Server
     """
     def handle(self):
-        endpoint = ServerEndpoint(self.rfile)
+        transport = self.request.makefile('rw')
+        endpoint = ServerEndpoint(transport)
         endpoint.run()
 
 
@@ -294,5 +296,6 @@ class Client(Endpoint):
     A client sending commands to the remote side
     """
     def __init__(self, address):
-        self.socket = socket.create_connection(address)
-        super(Client, self).__init__(self.socket.makefile(), 'client')
+        sock = socket.create_connection(address)
+        transport = sock.makefile('rw')
+        super(Client, self).__init__(transport, 'client')

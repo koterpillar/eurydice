@@ -25,7 +25,7 @@ class Concat(object):
             try:
                 source_str = self.source.get_string()
             except Exception as exc: # pylint:disable=broad-except
-                source_str = '[' + exc.message + ']'
+                source_str = '[' + str(exc) + ']'
         else:
             source_str = ''
 

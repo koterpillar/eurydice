@@ -73,7 +73,7 @@ class InteractionTest(object):
             # pylint:disable=no-member
             with pytest.raises(pypl.RemoteError) as exc:
                 robj.breakdown('five\n')
-            assert exc.value.message == 'five\n'
+            assert str(exc.value) == 'five\n'
 
     def test_local_exception(self):
         """

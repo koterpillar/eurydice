@@ -157,8 +157,14 @@ class PerlServerClient(ServerClient):
         port = self.address[1]
         os.execvp('perl', ['perl', '-Iperl', 'perl/server.pl', str(port)])
 
+    def __enter__(self):
+        client = super(PerlServerClient, self).__enter__()
+        time.sleep(0.5)
+        return client
+
     def __exit__(self, type_, value, traceback):
         os.kill(self.process.pid, signal.SIGKILL)
+        return False
 
 
 class TestPythonPython(InteractionTest):

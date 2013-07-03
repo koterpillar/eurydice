@@ -7,6 +7,7 @@ import multiprocessing
 import os
 import random
 import signal
+import socket
 import time
 import weakref
 
@@ -116,6 +117,9 @@ class ServerClient(object):
     """
     Base class for test clients as context objects
     """
+    CONNECT_RETRIES = 20
+    CONNECT_DELAY = 0.3
+
     def __init__(self):
         self.address = random_address()
         self.process = multiprocessing.Process(target=self.run_server)
@@ -129,7 +133,14 @@ class ServerClient(object):
 
     def __enter__(self):
         self.process.start()
-        time.sleep(0.3)
+        retries = 0
+        while retries < self.CONNECT_RETRIES:
+            try:
+                socket.create_connection(self.address)
+                break
+            except socket.error:
+                pass
+            time.sleep(self.CONNECT_DELAY)
         return pypl.Client(self.address)
 
     def __exit__(self, type_, value, traceback):
@@ -156,11 +167,6 @@ class PerlServerClient(ServerClient):
         """
         port = self.address[1]
         os.execvp('perl', ['perl', '-Iperl', 'perl/server.pl', str(port)])
-
-    def __enter__(self):
-        client = super(PerlServerClient, self).__enter__()
-        time.sleep(0.5)
-        return client
 
     def __exit__(self, type_, value, traceback):
         os.kill(self.process.pid, signal.SIGKILL)

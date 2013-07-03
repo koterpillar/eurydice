@@ -33,6 +33,8 @@ class RemoteObject(object):
             self.remote.delete(self)
         except socket.error:
             pass
+        except TransportException:
+            pass
 
 
 class RemoteError(Exception):
@@ -166,14 +168,18 @@ class Endpoint(object):
         """
         result = RECEIVE_AGAIN
         while result is RECEIVE_AGAIN:
-            line = self.decoder.decode(self.transport.readline())
-            command = line.pop(0)
+            try:
+                line = self.transport.readline()
+            except ValueError:
+                raise TransportException("Invalid data received: '%s'" % line)
+            args = self.decoder.decode(line)
+            command = args.pop(0)
 
             command_function = 'command_%s' % command
             if hasattr(self, command_function):
-                result = getattr(self, command_function)(line)
+                result = getattr(self, command_function)(args)
             else:
-                raise TransportException("Invalid command %s" % command)
+                raise TransportException("Invalid command: '%s'" % command)
         return result
 
     def _send_receive(self, command, *args):

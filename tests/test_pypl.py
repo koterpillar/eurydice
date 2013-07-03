@@ -117,8 +117,8 @@ class ServerClient(object):
     """
     Base class for test clients as context objects
     """
-    CONNECT_RETRIES = 20
-    CONNECT_DELAY = 0.3
+    CONNECT_RETRIES = 10
+    CONNECT_DELAY = 0.1
 
     def __init__(self):
         self.address = random_address()
@@ -133,14 +133,14 @@ class ServerClient(object):
 
     def __enter__(self):
         self.process.start()
-        retries = 0
-        while retries < self.CONNECT_RETRIES:
+        for retry in range(1, self.CONNECT_RETRIES):
             try:
                 socket.create_connection(self.address)
                 break
             except socket.error:
-                pass
-            time.sleep(self.CONNECT_DELAY)
+                if retry == self.CONNECT_RETRIES:
+                    raise
+            time.sleep(self.CONNECT_DELAY * (2 ** retry))
         return pypl.Client(self.address)
 
     def __exit__(self, type_, value, traceback):

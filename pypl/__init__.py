@@ -8,13 +8,14 @@ from functools import wraps
 
 import importlib
 
-import json
-
 import socket
 try:
     import socketserver # pylint:disable=import-error
 except ImportError:
     import SocketServer as socketserver
+
+from pypl.common import TransportException
+from pypl.transport import StreamJSONTransport
 
 
 class RemoteError(Exception):
@@ -22,79 +23,6 @@ class RemoteError(Exception):
     An exception occurred on the remote side
     """
     pass
-
-
-class TransportException(Exception):
-    """
-    An error due to incomprehensible data received from the remote side
-    """
-    pass
-
-
-class RemoteObject(object):
-    """
-    A representation of a remote object
-    """
-    def __init__(self, remote, ref):
-        self.remote = remote
-        self.ref = ref
-
-    def __getattr__(self, method):
-        return lambda *args: self.remote.call(self, method, *args)
-
-    def __del__(self):
-        try:
-            self.remote.delete(self)
-        except socket.error:
-            pass
-        except TransportException:
-            pass
-
-
-class RemoteJSONEncoder(json.JSONEncoder):
-    """
-    An encoder recognizing remote object proxies
-    """
-    def __init__(self, endpoint):
-        super(RemoteJSONEncoder, self).__init__()
-        self.endpoint = endpoint
-
-    def default(self, obj): # pylint:disable=method-hidden
-        if isinstance(obj, RemoteObject):
-            return obj.ref
-
-        index = id(obj)
-        if index not in self.endpoint.objects:
-            self.endpoint.objects[index] = obj
-
-        return {
-            '_remote_proxy': {
-                'id': index,
-                'instance': self.endpoint.identity,
-            },
-        }
-
-
-class RemoteJSONDecoder(json.JSONDecoder):
-    """
-    A decoder recognizing remote object proxies
-    """
-    def __init__(self, endpoint):
-        super(RemoteJSONDecoder, self).__init__(object_hook=self.decode_object)
-        self.endpoint = endpoint
-
-    def decode_object(self, obj):
-        """
-        Decode remote object proxies
-        """
-        if isinstance(obj, dict):
-            if '_remote_proxy' in obj:
-                proxy = obj['_remote_proxy']
-                if proxy['instance'] == self.endpoint.identity:
-                    return self.endpoint.objects[proxy['id']]
-                else:
-                    return RemoteObject(self.endpoint, obj)
-        return obj
 
 
 def callback(func):
@@ -144,23 +72,16 @@ class Endpoint(object):
     """
     Base class for clients and servers
     """
-    def __init__(self, transport, identity):
-        self.encoder = RemoteJSONEncoder(self)
-        self.decoder = RemoteJSONDecoder(self)
-
+    def __init__(self, transport):
         self.objects = {}
 
-        self.transport = transport
-
-        self.identity = identity
+        self.transport = StreamJSONTransport(transport, self)
 
     def _send(self, command, *args):
         """
         Send a command to the remote side
         """
-        line = self.encoder.encode([command] + list(args))
-        print(line, file=self.transport)
-        self.transport.flush()
+        self.transport.send(command, *args)
 
     def _receive(self):
         """
@@ -168,12 +89,7 @@ class Endpoint(object):
         """
         result = RECEIVE_AGAIN
         while result is RECEIVE_AGAIN:
-            line = self.transport.readline()
-            try:
-                args = self.decoder.decode(line)
-            except ValueError:
-                raise TransportException("Invalid data received: '%s'" % line)
-            command = args.pop(0)
+            (command, args) = self.transport.receive()
 
             command_function = 'command_%s' % command
             if hasattr(self, command_function):
@@ -268,8 +184,6 @@ class ServerEndpoint(Endpoint):
     """
     An endpoint passively executing commands from the remote side
     """
-    def __init__(self, transport):
-        super(ServerEndpoint, self).__init__(transport, 'server')
 
     def run(self):
         """
@@ -307,4 +221,4 @@ class Client(Endpoint):
     def __init__(self, address):
         sock = socket.create_connection(address)
         transport = sock.makefile('rw')
-        super(Client, self).__init__(transport, 'client')
+        super(Client, self).__init__(transport)

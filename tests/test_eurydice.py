@@ -1,5 +1,5 @@
 """
-Tests for the pypl module
+Tests for the eurydice module
 """
 
 import gc
@@ -13,7 +13,7 @@ import weakref
 
 import pytest
 
-import pypl
+import eurydice
 
 from tests.objects import Source, BadSource
 
@@ -72,7 +72,7 @@ class InteractionTest(object):
             robj = self.concat_object(client)
 
             # pylint:disable=no-member
-            with pytest.raises(pypl.RemoteError) as exc:
+            with pytest.raises(eurydice.RemoteError) as exc:
                 robj.breakdown('five\n')
             assert str(exc.value) == 'five\n'
 
@@ -141,7 +141,7 @@ class ServerClient(object):
                 if retry == self.CONNECT_RETRIES:
                     raise
             time.sleep(self.CONNECT_DELAY * (2 ** retry))
-        return pypl.Client(self.address)
+        return eurydice.Client(self.address)
 
     def __exit__(self, type_, value, traceback):
         self.process.terminate()
@@ -153,7 +153,7 @@ class PythonServerClient(ServerClient):
     Python server returning a client connected to it as a context object
     """
     def run_server(self):
-        server = pypl.Server(self.address)
+        server = eurydice.Server(self.address)
         server.serve_forever()
 
 

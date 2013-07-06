@@ -27,9 +27,9 @@ class PyTest(TestCommand): # pylint:disable=too-many-public-methods
 
 
 setup(
-    name="pypl",
+    name="eurydice",
     version="0.1",
-    packages=['pypl'],
+    packages=['eurydice'],
     install_requires=INSTALL_REQUIRES,
     tests_require=['pytest'],
     cmdclass={'test': PyTest},

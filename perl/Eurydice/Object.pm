@@ -1,4 +1,4 @@
-package PyPl::Object;
+package Eurydice::Object;
 
 use strict;
 use warnings;

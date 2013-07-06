@@ -8,7 +8,7 @@ import json
 
 import random
 
-from pypl.common import RemoteObject, TransportException
+from eurydice.common import RemoteObject, TransportException
 
 class Transport(object):
     """

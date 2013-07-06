@@ -5,7 +5,7 @@ use warnings;
 
 use IO::Socket;
 
-use PyPl::Server;
+use Eurydice::Server;
 
 my $port = $ARGV[0];
 
@@ -27,7 +27,7 @@ $server = IO::Socket::INET->new(
 ) or die("Cannot set up server.");
 
 while (my $client = $server->accept()) {
-	my $responder = PyPl::Server->new($client);
+	my $responder = Eurydice::Server->new($client);
 	my $success = eval { $responder->run() };
 	if (!$success) {
 		print STDERR $@;

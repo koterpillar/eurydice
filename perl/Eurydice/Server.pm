@@ -1,4 +1,4 @@
-package PyPl::Server;
+package Eurydice::Server;
 
 use strict;
 use warnings;
@@ -11,8 +11,8 @@ use Module::Load;
 
 use Scalar::Util qw(blessed refaddr);
 
-use PyPl::Module;
-use PyPl::Object;
+use Eurydice::Module;
+use Eurydice::Object;
 
 my $RECEIVE_AGAIN = bless \[], 'PerlServer::ReceiveAgain';
 
@@ -34,7 +34,7 @@ sub new {
 		if ($data->{instance} eq $this->{identity}) {
 			return $this->{objects}->{$data->{id}};
 		} else {
-			return PyPl::Object->new($this, $data);
+			return Eurydice::Object->new($this, $data);
 		}
 	});
 
@@ -85,7 +85,7 @@ sub encode {
 		object => sub {
 			my (undef, $object) = @_;
 
-			if ($object->isa('PyPl::Object')) {
+			if ($object->isa('Eurydice::Object')) {
 				return { _remote_proxy => $object->{proxy_data} };
 			} else {
 				my $index = refaddr($object);
@@ -140,7 +140,7 @@ sub command_import {
 
 	$this->wrap_action(sub {
 		load $module;
-		return PyPl::Module->new($this, $module);
+		return Eurydice::Module->new($this, $module);
 	});
 }
 

@@ -1,4 +1,4 @@
-pypl - the Python-Perl bridge
+Eurydice - the Python-Perl bridge
 =============================
 
 Introduction

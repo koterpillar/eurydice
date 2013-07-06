@@ -14,8 +14,8 @@ try:
 except ImportError:
     import SocketServer as socketserver
 
-from pypl.common import TransportException
-from pypl.transport import StreamJSONTransport
+from eurydice.common import TransportException
+from eurydice.transport import StreamJSONTransport
 
 
 class RemoteError(Exception):

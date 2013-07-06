@@ -1,4 +1,4 @@
-package PyPl::Module;
+package Eurydice::Module;
 
 use strict;
 use warnings;

@@ -11,7 +11,8 @@ INSTALL_REQUIRES = []
 if python_version() < '2.7.0':
     INSTALL_REQUIRES += ['importlib >= 1.0.2']
 
-class PyTest(TestCommand): # pylint:disable=too-many-public-methods
+
+class PyTest(TestCommand):  # pylint:disable=too-many-public-methods
     """
     Setuptools test command to run py.test
     """

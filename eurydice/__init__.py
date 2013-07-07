@@ -10,7 +10,7 @@ import importlib
 
 import socket
 try:
-    import socketserver # pylint:disable=import-error
+    import socketserver  # pylint:disable=import-error
 except ImportError:
     import SocketServer as socketserver
 
@@ -38,7 +38,7 @@ def callback(func):
         try:
             val = func(self, *args)
             returned = True
-        except Exception as exc: # pylint:disable=broad-except
+        except Exception as exc:  # pylint:disable=broad-except
             val = exc
             returned = False
 

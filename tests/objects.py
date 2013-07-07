@@ -2,6 +2,7 @@
 Simple objects for the tests
 """
 
+
 class Concat(object):
     """
     A test class concatenating strings passed in various ways
@@ -24,14 +25,14 @@ class Concat(object):
         if self.source:
             try:
                 source_str = self.source.get_string()
-            except Exception as exc: # pylint:disable=broad-except
+            except Exception as exc:  # pylint:disable=broad-except
                 source_str = '[' + str(exc) + ']'
         else:
             source_str = ''
 
         return self.own + source_str + other
 
-    def breakdown(self, how): # pylint:disable=no-self-use
+    def breakdown(self, how):  # pylint:disable=no-self-use
         """
         Raise an exception on purpose
         """

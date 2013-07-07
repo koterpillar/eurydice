@@ -2,6 +2,7 @@
 Generic routines
 """
 
+
 class TransportException(Exception):
     """
     An error due to incomprehensible data received from the transport side
@@ -25,4 +26,3 @@ class RemoteObject(object):
             self.transport.endpoint.delete(self)
         except TransportException:
             pass
-

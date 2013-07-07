@@ -10,6 +10,7 @@ import random
 
 from eurydice.common import RemoteObject, TransportException
 
+
 class Transport(object):
     """
     Base class for transports
@@ -85,7 +86,7 @@ class RemoteJSONEncoder(json.JSONEncoder):
         super(RemoteJSONEncoder, self).__init__()
         self.transport = transport
 
-    def default(self, obj): # pylint:disable=method-hidden
+    def default(self, obj):  # pylint:disable=method-hidden
         if isinstance(obj, RemoteObject):
             return obj.ref
 
@@ -132,7 +133,6 @@ class StreamJSONTransport(StreamLineTransport):
         self.identity = str(random.random())
         self.encoder = RemoteJSONEncoder(self)
         self.decoder = RemoteJSONDecoder(self)
-
 
     def decode(self, line):
         return self.decoder.decode(line)

@@ -35,14 +35,14 @@ class InteractionTest(object):
         Prepare a client to run the tests with
         """
         raise NotImplementedError(
-                "client() not implemented in base InteractionTest.")
+            "client() not implemented in base InteractionTest.")
 
     def concat_object(self, client):
         """
         Create a test remote object
         """
         raise NotImplementedError(
-                "concat_object() not implemented in base InteractionTest.")
+            "concat_object() not implemented in base InteractionTest.")
 
     def test_call(self):
         """
@@ -92,7 +92,7 @@ class InteractionTest(object):
         Initiate the garbage collection on the remote side
         """
         raise NotImplementedError(
-                "remote_gc() not implemented in base InteractionTest.")
+            "remote_gc() not implemented in base InteractionTest.")
 
     def test_delete(self):
         """
@@ -110,7 +110,7 @@ class InteractionTest(object):
 
             self.remote_gc(client)
 
-            assert ref() == None
+            assert ref() is None
 
 
 class ServerClient(object):
@@ -129,7 +129,7 @@ class ServerClient(object):
         Run the actual server
         """
         raise NotImplementedError(
-                "run_server() not implemented in base ServerClient.")
+            "run_server() not implemented in base ServerClient.")
 
     def __enter__(self):
         self.process.start()
@@ -203,6 +203,6 @@ class TestPythonPerl(InteractionTest):
     def remote_gc(self, client):
         pass
 
-    @pytest.mark.xfail # pylint:disable=no-member
+    @pytest.mark.xfail  # pylint:disable=no-member
     def test_delete(self):
         super(TestPythonPerl, self).test_delete()

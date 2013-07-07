@@ -8,6 +8,6 @@ install:
   - "curl -L http://cpanmin.us | perl - --sudo App::cpanminus"
   - "sudo cpanm -n Data::Visitor JSON Module::Load"
 script:
+  - "python setup.py test"
   - "pep8 ."
   - "pylint eurydice"
-  - "python setup.py test"

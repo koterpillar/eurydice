@@ -10,5 +10,5 @@ install:
   - "sudo pip install pep8 pylint"
 script:
   - "python setup.py test"
-  - "pep8 ."
+  - "pep8 eurydice"
   - "pylint eurydice"

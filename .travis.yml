@@ -7,7 +7,7 @@ python:
 install:
   - "curl -L http://cpanmin.us | perl - --sudo App::cpanminus"
   - "sudo cpanm -n Data::Visitor JSON Module::Load"
-  - "pip install pep8 pylint"
+  - "sudo pip install pep8 pylint"
 script:
   - "python setup.py test"
   - "pep8 ."

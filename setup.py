@@ -32,6 +32,6 @@ setup(
     version="0.1",
     packages=['eurydice'],
     install_requires=INSTALL_REQUIRES,
-    tests_require=['pep8', 'pytest', 'pylint'],
+    tests_require=['pytest'],
     cmdclass={'test': PyTest},
 )

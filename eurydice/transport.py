@@ -36,8 +36,8 @@ class Transport(object):
         raise NotImplementedError("Please override receive().")
 
 
-# pylint:disable=abstract-class-little-used
 class StreamLineTransport(Transport):
+    # pylint:disable=abstract-class-little-used
     """
     Transport sending messages through a file-like object
     """

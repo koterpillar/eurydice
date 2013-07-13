@@ -3,6 +3,8 @@ Common functionality for tests
 """
 
 import gc
+import multiprocessing
+import time
 import weakref
 
 import pytest
@@ -122,8 +124,52 @@ class PerlInteractionTest(InteractionTest):
         return rclass.new('one')
 
     def remote_gc(self, client):
+        # No GC API for Perl
         pass
 
     @pytest.mark.xfail  # pylint:disable=no-member
     def test_delete(self):
-        super(TestPythonPerl, self).test_delete()
+        super(PerlInteractionTest, self).test_delete()
+
+
+class ServerClient(object):
+    """
+    Base class for test clients as context objects
+    """
+    CONNECT_RETRIES = 10
+    CONNECT_DELAY = 0.1
+
+    def __init__(self):
+        self.process = multiprocessing.Process(target=self.run_server)
+
+    def run_server(self):
+        """
+        Run the actual server
+        """
+        raise NotImplementedError(
+            "run_server() not implemented in base ServerClient.")
+
+    def client(self):
+        """
+        Create a client connected to the server
+        """
+        raise NotImplementedError(
+            "client() not implemented in base ServerClient.")
+
+    def server_ready(self):  # pylint:disable=no-self-use
+        """
+        Check if the server is ready
+        """
+        return True
+
+    def __enter__(self):
+        self.process.start()
+        for retry in range(1, self.CONNECT_RETRIES):
+            if self.server_ready():
+                return self.client()
+            time.sleep(self.CONNECT_DELAY * (2 ** retry))
+        pytest.fail("Server failed to start.")  # pylint:disable=no-member
+
+    def __exit__(self, type_, value, traceback):
+        self.process.terminate()
+        return False

@@ -10,8 +10,7 @@ try:
 except ImportError:
     import SocketServer as socketserver
 
-from eurydice.common import TransportException
-from eurydice.endpoint import Endpoint, RemoteError
+from eurydice.endpoint import Endpoint
 from eurydice.transport import StreamLineTransport
 
 

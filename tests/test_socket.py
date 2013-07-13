@@ -1,20 +1,16 @@
 """
-Tests for the eurydice socket endpoints
+Tests for socket endpoints
 """
 
-import multiprocessing
 import os
 import random
 import signal
 import socket
-import time
-
-import pytest
 
 import eurydice
 import eurydice.socket
 
-from tests import *
+from tests import ServerClient, PythonInteractionTest, PerlInteractionTest
 
 
 def random_address():
@@ -25,42 +21,34 @@ def random_address():
     return ('127.0.0.1', port)
 
 
-class ServerClient(object):
+class SocketServerClient(ServerClient):
     """
-    Base class for test clients as context objects
+    Socket client with a temporary server as a context object
     """
-    CONNECT_RETRIES = 10
-    CONNECT_DELAY = 0.1
 
     def __init__(self):
+        super(SocketServerClient, self).__init__()
         self.address = random_address()
-        self.process = multiprocessing.Process(target=self.run_server)
 
     def run_server(self):
         """
         Run the actual server
         """
         raise NotImplementedError(
-            "run_server() not implemented in base ServerClient.")
+            "run_server() not implemented in base SocketServerClient.")
 
-    def __enter__(self):
-        self.process.start()
-        for retry in range(1, self.CONNECT_RETRIES):
-            try:
-                socket.create_connection(self.address)
-                break
-            except socket.error:
-                if retry == self.CONNECT_RETRIES:
-                    raise
-            time.sleep(self.CONNECT_DELAY * (2 ** retry))
+    def client(self):
         return eurydice.socket.Client(self.address)
 
-    def __exit__(self, type_, value, traceback):
-        self.process.terminate()
-        return False
+    def server_ready(self):
+        try:
+            socket.create_connection(self.address)
+            return True
+        except socket.error:
+            return False
 
 
-class PythonServerClient(ServerClient):
+class PythonServerClient(SocketServerClient):
     """
     Python server returning a client connected to it as a context object
     """
@@ -69,7 +57,7 @@ class PythonServerClient(ServerClient):
         server.serve_forever()
 
 
-class PerlServerClient(ServerClient):
+class PerlServerClient(SocketServerClient):
     """
     Perl server returning a client connected to it as a context object
     """

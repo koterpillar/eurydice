@@ -151,22 +151,3 @@ class StreamLineTransport(JSONTransport):
 
     def receive_chunk(self):
         return self.stream.readline()
-
-
-class WebSocketTransport(JSONTransport):
-    """
-    Transport communicating through a websocket
-    """
-    def __init__(self, stream, endpoint):
-        super(WebSocketTransport, self).__init__(endpoint)
-        self.stream = stream
-        if hasattr(self.stream, 'recv'):
-            self.receive = self.stream.recv
-        else:
-            self.receive = self.stream.receive
-
-    def send_chunk(self, chunk):
-        self.stream.send(chunk)
-
-    def receive_chunk(self):
-        return self.receive()

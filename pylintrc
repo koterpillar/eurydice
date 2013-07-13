@@ -1,5 +1,5 @@
 [MESSAGES CONTROL]
-disable=locally-disabled,star-args,too-few-public-methods
+disable=abstract-method,attribute-defined-outside-init,locally-disabled,star-args,too-few-public-methods,wildcard-import
 
 [REPORTS]
 symbols=yes

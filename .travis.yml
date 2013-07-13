@@ -5,10 +5,6 @@ python:
   - "3.2"
   - "3.3"
 install:
-  - "curl -L http://cpanmin.us | perl - --sudo App::cpanminus"
-  - "sudo cpanm -n Data::Visitor JSON Module::Load"
-  - "sudo pip install pep8 pylint"
+  - "sudo apt-get install cython libdata-visitor-perl libjson-perl libmodule-load-perl libevent-dev"
 script:
   - "python setup.py test"
-  - "pep8 eurydice"
-  - "pylint eurydice"

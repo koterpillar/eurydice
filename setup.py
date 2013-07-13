@@ -6,7 +6,11 @@ from setuptools import setup
 from setuptools.command.test import test as TestCommand
 import sys
 
-INSTALL_REQUIRES = []
+INSTALL_REQUIRES = [
+    'gevent >= 0.13.8',
+    'gevent-websocket >= 0.3.6',
+    'websocket-client >= 0.11.0',
+]
 
 if python_version() < '2.7.0':
     INSTALL_REQUIRES += ['importlib >= 1.0.2']

@@ -14,6 +14,7 @@ import weakref
 import pytest
 
 import eurydice
+import eurydice.socket
 
 from tests.objects import Source, BadSource
 
@@ -141,7 +142,7 @@ class ServerClient(object):
                 if retry == self.CONNECT_RETRIES:
                     raise
             time.sleep(self.CONNECT_DELAY * (2 ** retry))
-        return eurydice.Client(self.address)
+        return eurydice.socket.Client(self.address)
 
     def __exit__(self, type_, value, traceback):
         self.process.terminate()
@@ -153,7 +154,7 @@ class PythonServerClient(ServerClient):
     Python server returning a client connected to it as a context object
     """
     def run_server(self):
-        server = eurydice.Server(self.address)
+        server = eurydice.socket.Server(self.address)
         server.serve_forever()
 
 

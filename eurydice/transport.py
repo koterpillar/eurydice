@@ -21,7 +21,6 @@ class Transport(object):
         Initialize a transport
         """
         self.endpoint = endpoint
-        self.objects = endpoint.objects
 
     def send(self, command, *args):
         """
@@ -36,68 +35,27 @@ class Transport(object):
         raise NotImplementedError("Please override receive().")
 
 
-class StreamLineTransport(Transport):
-    # pylint:disable=abstract-class-little-used
-    """
-    Transport sending messages through a file-like object
-    """
-    def __init__(self, transport, objects):
-        super(StreamLineTransport, self).__init__(objects)
-        self.transport = transport
-
-    def decode(self, line):
-        """
-        Decode a line of data received
-        """
-        raise NotImplementedError("Please override decode().")
-
-    def encode(self, *args):
-        """
-        Encode a command to a chunk
-        """
-        raise NotImplementedError("Please override decode().")
-
-    def send(self, command, *args):
-        line = self.encode(command, *args)
-        try:
-            print(line, file=self.transport)
-            self.transport.flush()
-        except IOError as exc:
-            raise TransportException("Transport error: '%s'" % exc)
-
-    def receive(self):
-        try:
-            line = self.transport.readline()
-        except IOError as exc:
-            raise TransportException("Transport error: '%s'" % exc)
-        try:
-            args = self.decode(line)
-        except ValueError:
-            raise TransportException("Invalid data received: '%s'" % line)
-        command = args.pop(0)
-        return (command, args)
-
-
 class RemoteJSONEncoder(json.JSONEncoder):
     """
     An encoder recognizing remote object proxies
     """
-    def __init__(self, transport):
+    def __init__(self, endpoint, identity):
         super(RemoteJSONEncoder, self).__init__()
-        self.transport = transport
+        self.endpoint = endpoint
+        self.identity = identity
 
     def default(self, obj):  # pylint:disable=method-hidden
         if isinstance(obj, RemoteObject):
             return obj.ref
 
         index = id(obj)
-        if index not in self.transport.objects:
-            self.transport.objects[index] = obj
+        if index not in self.endpoint.objects:
+            self.endpoint.objects[index] = obj
 
         return {
             '_remote_proxy': {
                 'id': index,
-                'instance': self.transport.identity,
+                'instance': self.identity,
             },
         }
 
@@ -106,9 +64,10 @@ class RemoteJSONDecoder(json.JSONDecoder):
     """
     A decoder recognizing remote object proxies
     """
-    def __init__(self, transport):
+    def __init__(self, endpoint, identity):
         super(RemoteJSONDecoder, self).__init__(object_hook=self.decode_object)
-        self.transport = transport
+        self.endpoint = endpoint
+        self.identity = identity
 
     def decode_object(self, obj):
         """
@@ -117,25 +76,97 @@ class RemoteJSONDecoder(json.JSONDecoder):
         if isinstance(obj, dict):
             if '_remote_proxy' in obj:
                 proxy = obj['_remote_proxy']
-                if proxy['instance'] == self.transport.identity:
-                    return self.transport.objects[proxy['id']]
+                if proxy['instance'] == self.identity:
+                    return self.endpoint.objects[proxy['id']]
                 else:
-                    return RemoteObject(self.transport, obj)
+                    return RemoteObject(self.endpoint, obj)
         return obj
 
 
-class StreamJSONTransport(StreamLineTransport):
+class JSONTransport(Transport):
     """
-    Transport for encoding messages as JSON
+    Transport encoding messages by JSON
     """
-    def __init__(self, transport, objects):
-        super(StreamJSONTransport, self).__init__(transport, objects)
+    def __init__(self, endpoint):
+        super(JSONTransport, self).__init__(endpoint)
         self.identity = str(random.random())
-        self.encoder = RemoteJSONEncoder(self)
-        self.decoder = RemoteJSONDecoder(self)
+        self.encoder = RemoteJSONEncoder(endpoint, self.identity)
+        self.decoder = RemoteJSONDecoder(endpoint, self.identity)
 
-    def decode(self, line):
-        return self.decoder.decode(line)
+    def decode(self, message):
+        """
+        Decode a message using JSON
+        """
+        return self.decoder.decode(message)
 
     def encode(self, *args):
+        """
+        Encode a message using JSON
+        """
         return self.encoder.encode(list(args))
+
+    def send(self, command, *args):
+        chunk = self.encode(command, *args)
+        try:
+            self.send_chunk(chunk)
+        except IOError as exc:
+            raise TransportException("Transport error: '%s'" % exc)
+
+    def receive(self):
+        try:
+            chunk = self.receive_chunk()
+        except IOError as exc:
+            raise TransportException("Transport error: '%s'" % exc)
+        try:
+            args = self.decode(chunk)
+        except ValueError:
+            raise TransportException("Invalid data received: '%s'" % chunk)
+        command = args.pop(0)
+        return (command, args)
+
+    def send_chunk(self, chunk):
+        """
+        Send a chunk of data across
+        """
+        raise NotImplementedError("Please override send_chunk().")
+
+    def receive_chunk(self):
+        """
+        Receive a chunk of data
+        """
+        raise NotImplementedError("Please override receive_chunk().")
+
+
+class StreamLineTransport(JSONTransport):
+    """
+    Transport sending messages through a file-like object
+    """
+    def __init__(self, stream, endpoint):
+        super(StreamLineTransport, self).__init__(endpoint)
+        self.stream = stream
+
+    def send_chunk(self, chunk):
+        print(chunk, file=self.stream)
+        self.stream.flush()
+
+    def receive_chunk(self):
+        return self.stream.readline()
+
+
+class WebSocketTransport(JSONTransport):
+    """
+    Transport communicating through a websocket
+    """
+    def __init__(self, stream, endpoint):
+        super(WebSocketTransport, self).__init__(endpoint)
+        self.stream = stream
+        if hasattr(self.stream, 'recv'):
+            self.receive = self.stream.recv
+        else:
+            self.receive = self.stream.receive
+
+    def send_chunk(self, chunk):
+        self.stream.send(chunk)
+
+    def receive_chunk(self):
+        return self.receive()

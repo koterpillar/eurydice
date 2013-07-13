@@ -14,15 +14,15 @@ class RemoteObject(object):
     """
     A representation of a transport object
     """
-    def __init__(self, transport, ref):
-        self.transport = transport
+    def __init__(self, endpoint, ref):
+        self.endpoint = endpoint
         self.ref = ref
 
     def __getattr__(self, method):
-        return lambda *args: self.transport.endpoint.call(self, method, *args)
+        return lambda *args: self.endpoint.call(self, method, *args)
 
     def __del__(self):
         try:
-            self.transport.endpoint.delete(self)
+            self.endpoint.delete(self)
         except TransportException:
             pass

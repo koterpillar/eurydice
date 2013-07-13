@@ -6,5 +6,7 @@ python:
   - "3.3"
 install:
   - "sudo apt-get install cython libdata-visitor-perl libjson-perl libmodule-load-perl libevent-dev"
+  - "sudo pip install -U distribute"
+  - "sudo pip install https://bitbucket.org/pypa/setuptools/downloads/setuptools-0.9.1b1.tar.gz"
 script:
   - "python setup.py test"

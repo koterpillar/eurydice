@@ -24,7 +24,11 @@ $server = IO::Socket::INET->new(
 	Proto => 'tcp',
 	LocalPort => $port,
 	Listen => SOMAXCONN,
-) or die("Cannot set up server.");
+);
+
+if (!$server) {
+	die("Cannot set up server: $@");
+}
 
 while (my $client = $server->accept()) {
 	my $responder = Eurydice::Server->new($client);

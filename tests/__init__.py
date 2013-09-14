@@ -127,10 +127,6 @@ class PerlInteractionTest(InteractionTest):
         # No GC API for Perl
         pass
 
-    @pytest.mark.xfail  # pylint:disable=no-member
-    def test_delete(self):
-        super(PerlInteractionTest, self).test_delete()
-
 
 class ServerClient(object):
     """

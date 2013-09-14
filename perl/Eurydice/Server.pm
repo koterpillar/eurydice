@@ -9,7 +9,7 @@ use JSON;
 
 use Module::Load;
 
-use Scalar::Util qw(blessed refaddr);
+use Scalar::Util qw(blessed refaddr weaken);
 
 use Eurydice::Module;
 use Eurydice::Object;
@@ -67,6 +67,11 @@ sub process {
 
 		$line = $this->{json}->decode($line);
 		my ($command, @args) = @{$line};
+		#
+		# Prevent memory leaks in case @args contains an object
+		# which needs to be destroyed
+		#
+		$line = undef;
 
 		my $command_func = "command_$command";
 		if ($this->can($command_func)) {
@@ -147,6 +152,13 @@ sub command_import {
 sub command_delete {
 	my ($this, $object) = @_;
 
+	#
+	# Prevent memory leaks - $object, which is also
+	# the first argument to the method, is being
+	# destroyed
+	#
+	weaken($object);
+	weaken($_[1]);
 	return $this->wrap_action(sub {
 		my $id = refaddr($object);
 		delete $this->{objects}->{$id};

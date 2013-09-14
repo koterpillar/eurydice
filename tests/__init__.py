@@ -128,6 +128,20 @@ class PerlInteractionTest(InteractionTest):
         pass
 
 
+class JavaScriptInteractionTest(InteractionTest):
+    """
+    Interaction test with JavaScript on the remote side
+    """
+
+    def concat_object(self, client):
+        rclass = client.use('./concat.js')
+        return rclass.create('one')
+
+    def remote_gc(self, client):
+        rglobal = client.get_global('global')
+        return rglobal.gc()
+
+
 class ServerClient(object):
     """
     Base class for test clients as context objects
@@ -166,6 +180,6 @@ class ServerClient(object):
             time.sleep(self.CONNECT_DELAY * (2 ** retry))
         pytest.fail("Server failed to start.")  # pylint:disable=no-member
 
-    def __exit__(self, type_, value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.process.terminate()
         return False

@@ -8,8 +8,8 @@ from geventwebsocket.handler import WebSocketHandler
 import eurydice
 import eurydice.websocket
 
-from tests import PythonInteractionTest
-from tests.test_socket import SocketServerClient
+from tests import JavaScriptInteractionTest, PythonInteractionTest
+from tests.test_socket import ProcessServerClient, SocketServerClient
 
 
 class WebSocketServerClient(SocketServerClient):
@@ -33,9 +33,25 @@ class PythonWebSocketClient(WebSocketServerClient):
         server.serve_forever()
 
 
+class JavaScriptWebSocketClient(WebSocketServerClient, ProcessServerClient):
+    """
+    WebSocket client with a JavaScript server
+    """
+
+    arguments = ['nodejs', 'javascript/server.js']
+
+
 class TestPythonPython(PythonInteractionTest):
     """
     Test interaction with a Python server
     """
     def client(self):
         return PythonWebSocketClient()
+
+
+class TestPythonJavaScript(JavaScriptInteractionTest):
+    """
+    Test interaction with a JavaScript server
+    """
+    def client(self):
+        return JavaScriptWebSocketClient()

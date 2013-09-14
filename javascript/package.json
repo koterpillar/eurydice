@@ -1,0 +1,13 @@
+{
+  "name": "eurydice",
+  "version": "0.0.1",
+  "homepage": "https://github.com/koterpillar/eurydice",
+  "description": "Cross-language bridge",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/koterpillar/eurydice.git"
+  },
+  "dependencies": {
+    "ws": "~0.4"
+  }
+}

@@ -1,4 +1,5 @@
 *.pyc
 /build
+/javascript/node_modules
 /*.egg
 /*.egg-info

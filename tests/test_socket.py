@@ -57,20 +57,44 @@ class PythonServerClient(SocketServerClient):
         server.serve_forever()
 
 
-class PerlServerClient(SocketServerClient):
+class ProcessServerClient(SocketServerClient):
+    """
+    A server running an external process
+    """
+
+    @property
+    def arguments(self):
+        """
+        The command line to start the process. The port to listen onwill be
+        appended to it.
+        """
+        raise NotImplementedError(
+            "arguments() not implemented in base ProcessServerClient.")
+
+    termination_signal = signal.SIGTERM
+
+    def run_server(self):
+        """
+        Start the external process
+        """
+        port = self.address[1]
+        os.execvp(self.arguments[0], self.arguments + [str(port)])
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Terminate the external process with the specified signal
+        """
+        os.kill(self.process.pid, self.termination_signal)
+        return False
+
+
+class PerlServerClient(ProcessServerClient):
     """
     Perl server returning a client connected to it as a context object
     """
-    def run_server(self):
-        """
-        Start the Perl server
-        """
-        port = self.address[1]
-        os.execvp('perl', ['perl', '-Iperl', 'perl/server.pl', str(port)])
 
-    def __exit__(self, type_, value, traceback):
-        os.kill(self.process.pid, signal.SIGKILL)
-        return False
+    arguments = ['perl', '-Iperl', 'perl/server.pl']
+    termination_signal = signal.SIGKILL
 
 
 class TestPythonPython(PythonInteractionTest):

@@ -38,7 +38,7 @@ class JavaScriptWebSocketClient(WebSocketServerClient, ProcessServerClient):
     WebSocket client with a JavaScript server
     """
 
-    arguments = ['nodejs',
+    arguments = ['node',
                  '-harmony-proxies',
                  '-expose-gc',
                  'javascript/server.js']

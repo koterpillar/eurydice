@@ -1,14 +1,14 @@
-Eurydice - the Python-Perl bridge
+Eurydice - the cross-language bridge
 =============================
 
 Introduction
 ------------
 
-This is a bridge allowing to call from Python code into Perl, and vice versa.
-The intention is to seamlessly mix parts written in both without worrying
-about exactly which language is a part written in, and possibly replacing a
-Perl library with an equivalent Python one without modifying the rest of the
-code.
+This is a bridge allowing to call from Python code into Perl and JavaScript,
+and vice versa. The intention is to seamlessly mix parts written in one or the
+other without worrying about exactly which language is something written in,
+and possibly replacing a library with an equivalent one in a different language
+without modifying the rest of the code.
 
 While similar goal can be achieved using Protocol Buffers or Thrift, they only
 allow for calls returning a pre-defined type and do not provide a mechanism

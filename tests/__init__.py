@@ -141,6 +141,10 @@ class JavaScriptInteractionTest(InteractionTest):
         rglobal = client.get_global('global')
         return rglobal.gc()
 
+    @pytest.mark.xfail  # pylint:disable=no-member
+    def test_delete(self):
+        super(JavaScriptInteractionTest, self).test_delete()
+
 
 class ServerClient(object):
     """

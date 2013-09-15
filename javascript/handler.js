@@ -1,9 +1,45 @@
 var Q = require('q');
 
+function noop() {}
+
+function constant(value) {
+  return function () { return value; };
+}
+
+var remoteDescriptor = function (endpoint, obj) {
+  return function (method) {
+    if (method === 'inspect') {
+      return constant('[Remote proxy]');
+    }
+    return {
+      get: function () {
+        return function () {
+          var args = Array.prototype.slice.call(arguments);
+          args.unshift(method);
+          args.unshift(obj);
+          return endpoint.do_call.apply(endpoint, args);
+        };
+      }
+    };
+  };
+};
+
+var remoteProxy = function (endpoint, obj) {
+  return {
+    getOwnPropertyDescriptor: remoteDescriptor(endpoint, obj),
+    getPropertyDescriptor: remoteDescriptor(endpoint, obj),
+    getOwnPropertyNames: constant([]),
+    getPropertyNames: constant([]),
+    defineProperty: noop,
+    delete: noop,
+    fix: noop
+  };
+};
+
 module.exports = function Handler(socket) {
   var self = this;
 
-  var instance = Math.random();
+  var instance = 'JS' + Math.random();
 
   var objects = [];
 
@@ -15,10 +51,12 @@ module.exports = function Handler(socket) {
   function freezeObject(obj) {
     var type = typeof(obj);
     if (type === 'function' || type === 'object') {
-      // TODO: Check if this is a proxy for a remote object and convert it back
-      // to its representation
+      // Check if this is a proxy for a remote object and convert it back to
+      // its representation
       if ('_remote_proxy' in obj) {
-        throw "Remote proxies not implemented.";
+        return {
+          _remote_proxy: obj._remote_proxy
+        };
       }
       // Actually object, store it in the array (checking if it's there
       // already first)
@@ -45,14 +83,14 @@ module.exports = function Handler(socket) {
   }
 
   function thawObject(obj) {
-    if (typeof(obj) === 'object' && '_remote_proxy' in obj) {
+    if (typeof(obj) === 'object' && obj !== null && '_remote_proxy' in obj) {
       // Proxy for either a remote object or ours
       if (obj._remote_proxy.instance === instance) {
         // Proxy for our object, get it back
         return objects[obj._remote_proxy.id];
       } else {
-        // TODO: Create a proxy for the remote object
-        throw "Remote proxies not implemented.";
+        // Create a proxy for the remote object
+        return Proxy.create(remoteProxy(self, obj));
       }
     }
     return obj;
@@ -67,13 +105,7 @@ module.exports = function Handler(socket) {
     var args = message.map(thawObject);
     // get the command
     if (command in commands) {
-      Q.fapply(commands[command], args)
-      .then(function (result) {
-        send(['return', result]);
-      })
-      .catch(function (error) {
-        send(['error', error.toString()]);
-      });
+      commands[command].apply(void 0, args);
     }
   }
 
@@ -86,24 +118,35 @@ module.exports = function Handler(socket) {
     socket.send(message);
   }
 
-  commands.call = function (obj, method, args) {
+  function sendResult(func) {
+    return function () {
+      Q.fapply(func, arguments)
+      .then(function (result) {
+        send(['return', result]);
+      }).catch(function (error) {
+        send(['error', error.toString()]);
+      });
+    };
+  }
+
+  commands.call = sendResult(function (obj, method, args) {
     // unpack a variable number of arguments
     args = Array.prototype.slice.call(arguments);
     obj = args.shift();
     method = args.shift();
 
     return obj[method].apply(obj, args);
-  };
+  });
 
-  commands.global = function (obj) {
+  commands.global = sendResult(function (obj) {
     return global[obj];
-  };
+  });
 
-  commands.import = function (module) {
+  commands.import = sendResult(function (module) {
     return require(module);
-  };
+  });
 
-  commands.delete = function (obj) {
+  commands.delete = sendResult(function (obj) {
     for (var i = 0; i < objects.length; i++) {
       if (obj === objects[i]) {
         delete objects[i];
@@ -111,7 +154,7 @@ module.exports = function Handler(socket) {
       }
     }
     throw "Object not found.";
-  };
+  });
 
   commands.error = function (err) {
     var deferred = stack.pop();
@@ -121,6 +164,20 @@ module.exports = function Handler(socket) {
   commands.return = function (value) {
     var deferred = stack.pop();
     deferred.resolve(value);
+  };
+
+  this.do_call = function (obj, method, args) {
+    // unpack a variable number of arguments
+    args = Array.prototype.slice.call(arguments);
+    obj = args.shift();
+    method = args.shift();
+
+    // create a deferred to be resolved by the remote side
+    var result = Q.defer();
+    stack.push(result);
+
+    send(['call', obj, method].concat(args));
+    return result.promise;
   };
 
   socket.on('message', receive);

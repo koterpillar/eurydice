@@ -89,7 +89,7 @@ class JSONTransport(Transport):
     """
     def __init__(self, endpoint):
         super(JSONTransport, self).__init__(endpoint)
-        self.identity = str(random.random())
+        self.identity = 'PY' + str(random.random())
         self.encoder = RemoteJSONEncoder(endpoint, self.identity)
         self.decoder = RemoteJSONDecoder(endpoint, self.identity)
 

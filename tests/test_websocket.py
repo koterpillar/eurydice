@@ -38,7 +38,10 @@ class JavaScriptWebSocketClient(WebSocketServerClient, ProcessServerClient):
     WebSocket client with a JavaScript server
     """
 
-    arguments = ['nodejs', 'javascript/server.js']
+    arguments = ['nodejs',
+                 '-harmony-proxies',
+                 '-expose-gc',
+                 'javascript/server.js']
 
 
 class TestPythonPython(PythonInteractionTest):

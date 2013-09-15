@@ -2,24 +2,24 @@
  * A test class concatentating strings passed in various ways
  */
 function Concat(own) {
-  this.own = own;
-  this.source = none;
+  var _own = own;
+  var _source;
 
   /**
    * Add an object to ask for a string to concatenate from
    */
-  function set_source(source) {
-    this.source = source;
-  }
+  this.set_source = function (source) {
+    _source = source;
+  };
 
   /**
    * Concatenate all the strings
    */
-  function concat(other) {
+  this.concat = function(other) {
     var source_str;
-    if(this.source) {
+    if(_source) {
       try {
-        source_str = this.source.get_string();
+        source_str = _source.get_string();
       } catch (e) {
         source_str = '[' + e.toString() + ']';
       }
@@ -27,7 +27,7 @@ function Concat(own) {
       source_str = '';
     }
 
-    return this.own + source_str + other;
+    return _own + source_str + other;
   }
 
   /**
